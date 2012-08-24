@@ -176,6 +176,7 @@ class Resource(object):
 
         if not api_name is None:
             self._meta.api_name = api_name
+        self.response_handler = self._meta.response_handler
 
     def __getattr__(self, name):
         if name in self.fields:
@@ -197,14 +198,14 @@ class Resource(object):
                 callback = getattr(self, view)
                 response = callback(request, *args, **kwargs)
 
-                self._meta.response_handler.handle_cache_control(request, response)
+                self.response_handler.handle_cache_control(request, response)
 
                 return response
             except (BadRequest, fields.ApiFieldError), e:
-                return self._meta.response_handler.return_bad_request(request, e.args[0])
+                return self.response_handler.return_bad_request(request, e.args[0])
 
             except ValidationError, e:
-                return self._meta.response_handler.return_bad_request(request, ', '.join(e.messages))
+                return self.response_handler.return_bad_request(request, ', '.join(e.messages))
 
             except Exception, e:
                 if hasattr(e, 'response'):
@@ -447,7 +448,7 @@ class Resource(object):
         method = getattr(self, "%s_%s" % (request_method, request_type), None)
 
         if method is None:
-            raise ImmediateResponse(response=self._meta.response_handler.return_not_implemented(request))
+            raise ImmediateResponse(response=self.response_handler.return_not_implemented(request))
 
         self.is_authenticated(request)
         self.is_authorized(request)
@@ -463,8 +464,8 @@ class Resource(object):
         # If what comes back isn't a ``HttpResponse``, assume that the
         # request was accepted and that some action occurred. This also
         # prevents Django from freaking out.
-        if not isinstance(response, self._meta.response_handler.return_response_type(request)):
-            return self._meta.response_handler.return_no_content(request)
+        if not isinstance(response, self.response_handler.return_response_type(request)):
+            return self.response_handler.return_no_content(request)
 
         return response
 
@@ -1061,7 +1062,7 @@ class Resource(object):
         """
         desired_format = self.determine_format(request)
         serialized = self.serialize(request, data, desired_format)
-        return self._meta.response_handler.create_response(request, content=serialized,
+        return self.response_handler.create_response(request, content=serialized,
                                                            content_type=build_content_type(desired_format), **response_kwargs)
 
 
