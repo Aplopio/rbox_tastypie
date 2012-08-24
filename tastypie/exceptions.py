@@ -69,7 +69,7 @@ class InvalidSortError(TastypieError):
     pass
 
 
-class ImmediateHttpResponse(TastypieError):
+class ImmediateResponse(TastypieError):
     """
     This exception is used to interrupt the flow of processing to immediately
     return a custom HttpResponse.

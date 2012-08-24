@@ -9,13 +9,12 @@ from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver4
 from django.db import transaction
 from django.db.models.sql.constants import QUERY_TERMS, LOOKUP_SEP
 from django.http import HttpResponse, HttpResponseNotFound, Http404
-from django.utils.cache import patch_cache_control
 from tastypie.authentication import Authentication
 from tastypie.authorization import ReadOnlyAuthorization
 from tastypie.bundle import Bundle
 from tastypie.cache import NoCache
 from tastypie.constants import ALL, ALL_WITH_RELATIONS
-from tastypie.exceptions import NotFound, BadRequest, InvalidFilterError, HydrationError, InvalidSortError, ImmediateHttpResponse
+from tastypie.exceptions import NotFound, BadRequest, InvalidFilterError, HydrationError, InvalidSortError, ImmediateResponse
 from tastypie import fields
 from tastypie import http
 from tastypie.paginator import Paginator
@@ -23,7 +22,9 @@ from tastypie.serializers import Serializer
 from tastypie.throttle import BaseThrottle
 from tastypie.utils import is_valid_jsonp_callback_value, dict_strip_unicode_keys, trailing_slash
 from tastypie.utils.mime import determine_format, build_content_type
+from tastypie.utils import get_current_func_name, get_request_class
 from tastypie.validation import Validation
+from tastypie.responses import ResponseHandler
 try:
     set
 except NameError:
@@ -54,6 +55,7 @@ class ResourceOptions(object):
     Provides sane defaults and the logic needed to augment these settings with
     the internal ``class Meta`` used on ``Resource`` subclasses.
     """
+    response_handler = ResponseHandler()
     serializer = Serializer()
     authentication = Authentication()
     authorization = ReadOnlyAuthorization()
@@ -195,17 +197,15 @@ class Resource(object):
                 callback = getattr(self, view)
                 response = callback(request, *args, **kwargs)
 
-                if request.is_ajax() and not response.has_header("Cache-Control"):
-                    # IE excessively caches XMLHttpRequests, so we're disabling
-                    # the browser cache here.
-                    # See http://www.enhanceie.com/ie/bugs.asp for details.
-                    patch_cache_control(response, no_cache=True)
+                self._meta.response_handler.handle_cache_control(request, response)
 
                 return response
             except (BadRequest, fields.ApiFieldError), e:
-                return http.HttpBadRequest(e.args[0])
+                return self._meta.response_handler.return_bad_request(request, e.args[0])
+
             except ValidationError, e:
-                return http.HttpBadRequest(', '.join(e.messages))
+                return self._meta.response_handler.return_bad_request(request, ', '.join(e.messages))
+
             except Exception, e:
                 if hasattr(e, 'response'):
                     return e.response
@@ -229,6 +229,10 @@ class Resource(object):
         return wrapper
 
     def _handle_500(self, request, exception):
+        method = getattr(self, '%s_%s' % (get_current_func_name(), get_request_class(request)))
+        return method(request, exception)
+
+    def _handle_500_wsgirequest(self, request, exception):        
         import traceback
         import sys
         the_trace = '\n'.join(traceback.format_exception(*(sys.exc_info())))
@@ -443,7 +447,7 @@ class Resource(object):
         method = getattr(self, "%s_%s" % (request_method, request_type), None)
 
         if method is None:
-            raise ImmediateHttpResponse(response=http.HttpNotImplemented())
+            raise ImmediateResponse(response=self._meta.response_handler.return_not_implemented(request))
 
         self.is_authenticated(request)
         self.is_authorized(request)
@@ -459,8 +463,8 @@ class Resource(object):
         # If what comes back isn't a ``HttpResponse``, assume that the
         # request was accepted and that some action occurred. This also
         # prevents Django from freaking out.
-        if not isinstance(response, HttpResponse):
-            return http.HttpNoContent()
+        if not isinstance(response, self._meta.response_handler.return_response_type(request)):
+            return self._meta.response_handler.return_no_content(request)
 
         return response
 
@@ -530,10 +534,10 @@ class Resource(object):
         auth_result = self._meta.authorization.is_authorized(request, object)
 
         if isinstance(auth_result, HttpResponse):
-            raise ImmediateHttpResponse(response=auth_result)
+            raise ImmediateResponse(response=auth_result)
 
         if not auth_result is True:
-            raise ImmediateHttpResponse(response=http.HttpUnauthorized())
+            raise ImmediateResponse(response=http.HttpUnauthorized())
 
     def is_authenticated(self, request):
         """
@@ -559,12 +563,17 @@ class Resource(object):
         Mostly a hook, this uses class assigned to ``throttle`` from
         ``Resource._meta``.
         """
+        method = getattr(self, '%s_%s' %(get_current_func_name(), get_request_class(request)))
+        return method(request)
+
+    def throttle_check_wsgirequest(self, request):        
+        
         identifier = self._meta.authentication.get_identifier(request)
 
         # Check to see if they should be throttled.
         if self._meta.throttle.should_be_throttled(identifier):
             # Throttle limit exceeded.
-            raise ImmediateHttpResponse(response=http.HttpTooManyRequests())
+            raise ImmediateResponse(response=http.HttpTooManyRequests())
 
     def log_throttled_access(self, request):
         """
@@ -573,6 +582,10 @@ class Resource(object):
         Mostly a hook, this uses class assigned to ``throttle`` from
         ``Resource._meta``.
         """
+        method = getattr(self, '%s_%s' %(get_current_func_name(), get_request_class(request)))
+        return method(request)
+        
+    def log_throttled_access_wsgirequest(self, request):
         request_method = request.method.lower()
         self._meta.throttle.accessed(self._meta.authentication.get_identifier(request), url=request.get_full_path(), request_method=request_method)
 
@@ -1048,7 +1061,9 @@ class Resource(object):
         """
         desired_format = self.determine_format(request)
         serialized = self.serialize(request, data, desired_format)
-        return response_class(content=serialized, content_type=build_content_type(desired_format), **response_kwargs)
+        return self._meta.response_handler.create_response(request, content=serialized,
+                                                           content_type=build_content_type(desired_format), **response_kwargs)
+
 
     def error_response(self, errors, request):
         if request:
@@ -1058,7 +1073,7 @@ class Resource(object):
 
         serialized = self.serialize(request, errors, desired_format)
         response = http.HttpBadRequest(content=serialized, content_type=build_content_type(desired_format))
-        raise ImmediateHttpResponse(response=response)
+        raise ImmediateResponse(response=response)
 
     def is_valid(self, bundle, request=None):
         """
