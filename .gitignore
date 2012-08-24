@@ -1,4 +1,6 @@
 *.pyc
+*.py~
+#*.*#
 .DS_Store
 _build
 .*.sw[po]
