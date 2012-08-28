@@ -11,3 +11,5 @@ MANIFEST
 tests/tastypie.db
 .buildinfo
 .tox
+local_settings.py
+
