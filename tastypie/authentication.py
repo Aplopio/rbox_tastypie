@@ -155,7 +155,7 @@ class ApiKeyAuthentication(Authentication):
     as suits your needs.
     """
     def _unauthorized(self):
-        return HttpUnauthorized()
+        return False
 
     def extract_credentials(self, request):
         if request.META.get('HTTP_AUTHORIZATION') and request.META['HTTP_AUTHORIZATION'].lower().startswith('apikey '):
