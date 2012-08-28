@@ -166,7 +166,7 @@ class Serializer(object):
                 if hasattr(self, "to_%s" % short_format):
                     desired_format = short_format
                     break
-
+        
         if desired_format is None:
             raise UnsupportedFormat("The format indicated '%s' had no available serialization method. Please check your ``formats`` and ``content_types`` on your Serializer." % format)
 

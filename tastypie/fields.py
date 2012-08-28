@@ -386,7 +386,7 @@ class RelatedField(ApiField):
     self_referential = False
     help_text = 'A related resource. Can be either a URI or set of nested resource data.'
 
-    def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, full=False, unique=False, help_text=None):
+    def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, full=False, unique=False, help_text=None, uri_cls_list=None):
         """
         Builds the field and prepares it to access to related data.
 
@@ -436,6 +436,7 @@ class RelatedField(ApiField):
         self.resource_name = None
         self.unique = unique
         self._to_class = None
+        self.uri_cls_list = uri_cls_list or [basestring]
 
         if self.to == 'self':
             self.self_referential = True
@@ -505,7 +506,7 @@ class RelatedField(ApiField):
         """
         if not self.full:
             # Be a good netizen.
-            return related_resource.get_resource_uri(bundle)
+            return related_resource.get_resource_uri(bundle.request, bundle)
         else:
             # ZOMG extra data and big payloads.
             bundle = related_resource.build_bundle(obj=related_resource.instance, request=bundle.request)
@@ -575,6 +576,7 @@ class RelatedField(ApiField):
         Accepts either a URI, a data dictionary (or dictionary-like structure)
         or an object with a ``pk``.
         """
+
         self.fk_resource = self.to_class()
         kwargs = {
             'request': request,
@@ -582,7 +584,7 @@ class RelatedField(ApiField):
             'related_name': related_name,
         }
 
-        if isinstance(value, basestring):
+        if isinstance(value, tuple(self.uri_cls_list)):
             # We got a URI. Load the object and assign it.
             return self.resource_from_uri(self.fk_resource, value, **kwargs)
         elif isinstance(value, Bundle):

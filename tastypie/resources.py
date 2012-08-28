@@ -192,20 +192,21 @@ class Resource(object):
         are seen, there is special handling to either present a message back
         to the user or return the response traveling with the exception.
         """
+
         @csrf_exempt
         def wrapper(request, *args, **kwargs):
             try:
                 callback = getattr(self, view)
                 response = callback(request, *args, **kwargs)
 
-                self.response_handler.handle_cache_control(request, response)
+                response = self.response_handler.handle_cache_control(request, response)
 
                 return response
             except (BadRequest, fields.ApiFieldError), e:
-                return self.response_handler.return_bad_request(request, e.args[0])
+                return self.response_handler.get_bad_request_response(request, e.args[0])
 
             except ValidationError, e:
-                return self.response_handler.return_bad_request(request, ', '.join(e.messages))
+                return self.response_handler.get_bad_request_response(request, ', '.join(e.messages))
 
             except Exception, e:
                 if hasattr(e, 'response'):
@@ -464,8 +465,9 @@ class Resource(object):
         # If what comes back isn't a ``HttpResponse``, assume that the
         # request was accepted and that some action occurred. This also
         # prevents Django from freaking out.
-        if not isinstance(response, self.response_handler.return_response_type(request)):
-            return self.response_handler.return_no_content(request)
+        
+        ##if not isinstance(response, self.response_handler.get_response_class(request)):
+        ##return self.response_handler.return_no_content(request)
 
         return response
 
@@ -514,14 +516,16 @@ class Resource(object):
         allows = ','.join(map(str.upper, allowed))
 
         if request_method == "options":
-            response = HttpResponse(allows)
+            response_class = self.get_default_response_class(request)
+            response = response_class(allows)
             response['Allow'] = allows
-            raise ImmediateHttpResponse(response=response)
+            raise ImmediateResponse(response=response)
 
         if not request_method in allowed:
-            response = http.HttpMethodNotAllowed(allows)
+            
+            response = self.response_handler.get_method_notallowed_response(allows)
             response['Allow'] = allows
-            raise ImmediateHttpResponse(response=response)
+            raise ImmediateResponse(response=response)
 
         return request_method
 
@@ -534,11 +538,9 @@ class Resource(object):
         """
         auth_result = self._meta.authorization.is_authorized(request, object)
 
-        if isinstance(auth_result, HttpResponse):
-            raise ImmediateResponse(response=auth_result)
-
         if not auth_result is True:
-            raise ImmediateResponse(response=http.HttpUnauthorized())
+            return self.response_handler.get_unauthorized_request_response(request)
+
 
     def is_authenticated(self, request):
         """
@@ -550,12 +552,9 @@ class Resource(object):
         """
         # Authenticate the request as needed.
         auth_result = self._meta.authentication.is_authenticated(request)
-
-        if isinstance(auth_result, HttpResponse):
-            raise ImmediateHttpResponse(response=auth_result)
-
         if not auth_result is True:
-            raise ImmediateHttpResponse(response=http.HttpUnauthorized())
+            return self.response_handler.get_unauthorized_request_response(request)
+
 
     def throttle_check(self, request):
         """
@@ -574,7 +573,7 @@ class Resource(object):
         # Check to see if they should be throttled.
         if self._meta.throttle.should_be_throttled(identifier):
             # Throttle limit exceeded.
-            raise ImmediateResponse(response=http.HttpTooManyRequests())
+            raise ImmediateResponse(response=self.response_handler.get_too_many_request_response(request))
 
     def log_throttled_access(self, request):
         """
@@ -672,7 +671,7 @@ class Resource(object):
 
         return kwargs
 
-    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
+    def get_resource_uri(self, request, bundle_or_obj=None, **kwargs):
         """
         Handles generating a resource URI.
 
@@ -685,6 +684,16 @@ class Resource(object):
         Return the generated URI. If that URI can not be reversed (not found
         in the URLconf), it will return an empty string.
         """
+        #check for format
+        _format = self.determine_format(request)
+        ##strip the "application" in "application/{format}"
+        _format = _format.split('/')[1]
+        
+        ##WARNING: if a method is not provided for your type will pass to default
+        method = getattr(self, '%s_%s' % (get_current_func_name(), _format), self.get_resource_uri_default)
+        return method(request, bundle_or_obj, **kwargs)
+
+    def get_resource_uri_default(self, request, bundle_or_obj, url_name='api_dispatch_list', **kwargs):
         if bundle_or_obj is not None:
             url_name = 'api_dispatch_detail'
 
@@ -703,6 +712,11 @@ class Resource(object):
         If you need custom behavior based on other portions of the URI,
         simply override this method.
         """
+        method = getattr(self, '%s_%s' % (get_current_func_name(), get_request_class(request)))
+        return method(uri, request)
+
+
+    def get_via_uri_wsgirequest(self, uri, request=None):
         prefix = get_script_prefix()
         chomped_uri = uri
 
@@ -881,7 +895,7 @@ class Resource(object):
         Returns empty string if no URI can be generated.
         """
         try:
-            return self.get_resource_uri(bundle)
+            return self.get_resource_uri(bundle.request, bundle)
         except NotImplementedError:
             return ''
         except NoReverseMatch:
@@ -1054,16 +1068,17 @@ class Resource(object):
         """
         raise NotImplementedError()
 
-    def create_response(self, request, data, response_class=HttpResponse, **response_kwargs):
+    def create_response(self, request, data, response_class=None, **response_kwargs):
         """
         Extracts the common "which-format/serialize/return-response" cycle.
 
         Mostly a useful shortcut/hook.
         """
+        response_class = response_class or self.response_handler.get_default_response_class(request)
         desired_format = self.determine_format(request)
         serialized = self.serialize(request, data, desired_format)
-        return self.response_handler.create_response(request, content=serialized,
-                                                           content_type=build_content_type(desired_format), **response_kwargs)
+        return response_class(content=serialized,
+                              content_type=build_content_type(desired_format), **response_kwargs)
 
 
     def error_response(self, errors, request):
@@ -1073,7 +1088,7 @@ class Resource(object):
             desired_format = self._meta.default_format
 
         serialized = self.serialize(request, errors, desired_format)
-        response = http.HttpBadRequest(content=serialized, content_type=build_content_type(desired_format))
+        response = self.response_handler.get_bad_request_response(content=serialized, content_type=build_content_type(desired_format))
         raise ImmediateResponse(response=response)
 
     def is_valid(self, bundle, request=None):
@@ -1123,7 +1138,7 @@ class Resource(object):
         objects = self.obj_get_list(request=request, **self.remove_api_resource_names(kwargs))
         sorted_objects = self.apply_sorting(objects, options=request.GET)
 
-        paginator = self._meta.paginator_class(request.GET, sorted_objects, resource_uri=self.get_resource_uri(), limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
+        paginator = self._meta.paginator_class(request.GET, sorted_objects, resource_uri=self.get_resource_uri(request), limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
         to_be_serialized = paginator.page()
 
         # Dehydrate the bundles in preparation for serialization.
@@ -1144,9 +1159,9 @@ class Resource(object):
         try:
             obj = self.cached_obj_get(request=request, **self.remove_api_resource_names(kwargs))
         except ObjectDoesNotExist:
-            return http.HttpNotFound()
+            return self.response_handler.get_not_found_response(request)
         except MultipleObjectsReturned:
-            return http.HttpMultipleChoices("More than one resource is found at this URI.")
+            return self.response_handler.get_multiple_choices_response("More than one resource is found at this URI.")
 
         bundle = self.build_bundle(obj=obj, request=request)
         bundle = self.full_dehydrate(bundle)
@@ -1182,17 +1197,18 @@ class Resource(object):
             try:
                 self.obj_create(bundle, request=request, **self.remove_api_resource_names(kwargs))
                 bundles_seen.append(bundle)
-            except ImmediateHttpResponse:
+            except ImmediateResponse:
                 self.rollback(bundles_seen)
                 raise
 
         if not self._meta.always_return_data:
-            return http.HttpNoContent()
+            return self.response_handler.get_no_content_response(request)
         else:
             to_be_serialized = {}
             to_be_serialized['objects'] = [self.full_dehydrate(bundle) for bundle in bundles_seen]
             to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
-            return self.create_response(request, to_be_serialized, response_class=http.HttpAccepted)
+            response_class = self.response_handler.get_accepted_response_class(request)
+            return self.create_response(request, to_be_serialized, response_class=response_class)
 
     def put_detail(self, request, **kwargs):
         """
@@ -1221,21 +1237,23 @@ class Resource(object):
             updated_bundle = self.obj_update(bundle, request=request, **self.remove_api_resource_names(kwargs))
 
             if not self._meta.always_return_data:
-                return http.HttpNoContent()
+                return self.get_no_content_response(request)
             else:
                 updated_bundle = self.full_dehydrate(updated_bundle)
                 updated_bundle = self.alter_detail_data_to_serialize(request, updated_bundle)
-                return self.create_response(request, updated_bundle, response_class=http.HttpAccepted)
+                response_class = self.response_class.get_accepted_response_class(request)
+                return self.create_response(request, updated_bundle, response_class=response_class)
         except (NotFound, MultipleObjectsReturned):
             updated_bundle = self.obj_create(bundle, request=request, **self.remove_api_resource_names(kwargs))
-            location = self.get_resource_uri(updated_bundle)
+            location = self.get_resource_uri(updated_bundle.request, updated_bundle)
 
             if not self._meta.always_return_data:
-                return http.HttpCreated(location=location)
+                return self.response_handler.get_created_response(location=location)
             else:
                 updated_bundle = self.full_dehydrate(updated_bundle)
                 updated_bundle = self.alter_detail_data_to_serialize(request, updated_bundle)
-                return self.create_response(request, updated_bundle, response_class=http.HttpCreated, location=location)
+                response_class = self.response_handler.get_created_response_class(request)
+                return self.create_response(request, updated_bundle, response_class=response_class, location=location)
 
     def post_list(self, request, **kwargs):
         """
@@ -1252,14 +1270,15 @@ class Resource(object):
         deserialized = self.alter_deserialized_detail_data(request, deserialized)
         bundle = self.build_bundle(data=dict_strip_unicode_keys(deserialized), request=request)
         updated_bundle = self.obj_create(bundle, request=request, **self.remove_api_resource_names(kwargs))
-        location = self.get_resource_uri(updated_bundle)
-
+        location = self.get_resource_uri(updated_bundle.request, updated_bundle)
+        response_class = self.response_handler.get_created_response_class(request)
         if not self._meta.always_return_data:
-            return http.HttpCreated(location=location)
+            return response_class(location=location)
         else:
             updated_bundle = self.full_dehydrate(updated_bundle)
             updated_bundle = self.alter_detail_data_to_serialize(request, updated_bundle)
-            return self.create_response(request, updated_bundle, response_class=http.HttpCreated, location=location)
+            
+            return self.create_response(request, updated_bundle, response_class=response_class, location=location)
 
     def post_detail(self, request, **kwargs):
         """
@@ -1270,7 +1289,8 @@ class Resource(object):
 
         If a new resource is created, return ``HttpCreated`` (201 Created).
         """
-        return http.HttpNotImplemented()
+        return self.response_handler.get_not_implemented_response(request)
+        
 
     def delete_list(self, request, **kwargs):
         """
@@ -1281,7 +1301,7 @@ class Resource(object):
         If the resources are deleted, return ``HttpNoContent`` (204 No Content).
         """
         self.obj_delete_list(request=request, **self.remove_api_resource_names(kwargs))
-        return http.HttpNoContent()
+        return self.response_handler.get_no_content_response(request)
 
     def delete_detail(self, request, **kwargs):
         """
@@ -1294,9 +1314,10 @@ class Resource(object):
         """
         try:
             self.obj_delete(request=request, **self.remove_api_resource_names(kwargs))
-            return http.HttpNoContent()
         except NotFound:
-            return http.HttpNotFound()
+            pass
+
+        return self.response_handler.get_no_content_response(request)
 
     def patch_list(self, request, **kwargs):
         """
@@ -1355,7 +1376,7 @@ class Resource(object):
             raise BadRequest("Invalid data sent.")
 
         if len(deserialized["objects"]) and 'put' not in self._meta.detail_allowed_methods:
-            raise ImmediateHttpResponse(response=http.HttpMethodNotAllowed())
+            raise ImmediateResponse(response=self.response_handler.get_method_notallowed_response(request))
 
         for data in deserialized["objects"]:
             # If there's a resource_uri then this is either an
@@ -1385,13 +1406,13 @@ class Resource(object):
                 self.obj_create(bundle, request=request)
 
         if len(deserialized.get('deleted_objects', [])) and 'delete' not in self._meta.detail_allowed_methods:
-            raise ImmediateHttpResponse(response=http.HttpMethodNotAllowed())
+            raise ImmediateResponse(response=self.response_handler.get_method_notallowed_response(request))
 
         for uri in deserialized.get('deleted_objects', []):
             obj = self.get_via_uri(uri, request=request)
             self.obj_delete(request=request, _obj=obj)
 
-        return http.HttpAccepted()
+        return self.response_handler.get_accepted_response_class(request)()
 
     def patch_detail(self, request, **kwargs):
         """
@@ -1413,9 +1434,11 @@ class Resource(object):
         try:
             obj = self.cached_obj_get(request=request, **self.remove_api_resource_names(kwargs))
         except ObjectDoesNotExist:
-            return http.HttpNotFound()
+            return self.response_handler.get_not_found_response(request)
         except MultipleObjectsReturned:
-            return http.HttpMultipleChoices("More than one resource is found at this URI.")
+            content = "More than one resource is found at this URI."
+            return self.response_handler.get_multiple_choices_response(request, content)
+
 
         bundle = self.build_bundle(obj=obj, request=request)
         bundle = self.full_dehydrate(bundle)
@@ -1426,11 +1449,12 @@ class Resource(object):
         self.update_in_place(request, bundle, deserialized)
 
         if not self._meta.always_return_data:
-            return http.HttpAccepted()
+            return self.response_handler.get_accepted_response_class(request)()
         else:
             bundle = self.full_dehydrate(bundle)
             bundle = self.alter_detail_data_to_serialize(request, bundle)
-            return self.create_response(request, bundle, response_class=http.HttpAccepted)
+            response_class = self.response_handler.get_accepted_response_class(request)
+            return self.create_response(request, bundle, response_class=response_class)
 
     def update_in_place(self, request, original_bundle, new_data):
         """
@@ -1865,7 +1889,6 @@ class ModelResource(Resource):
         if hasattr(request, 'GET'):
             # Grab a mutable copy.
             filters = request.GET.copy()
-
         # Update with the provided kwargs.
         filters.update(kwargs)
         applicable_filters = self.build_filters(filters=filters)
@@ -1901,7 +1924,6 @@ class ModelResource(Resource):
         """
         A ORM-specific implementation of ``obj_create``.
         """
-
         bundle.obj = self._meta.object_class()
 
         for key, value in kwargs.items():
