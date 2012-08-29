@@ -1482,8 +1482,9 @@ class Resource(object):
         Should return a HttpResponse (200 OK).
         """
         self.method_check(request, allowed=['get'])
-        self.is_authenticated(request)
-        self.throttle_check(request)
+        if  not (self.is_authenticated(request) and  self.throttle_check(request)):
+            return self.response_handler.get_unauthorized_request_response(request)
+                 
         self.log_throttled_access(request)
         return self.create_response(request, self.build_schema())
 
