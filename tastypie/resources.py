@@ -209,24 +209,8 @@ class Resource(object):
                 return self.response_handler.get_bad_request_response(request, ', '.join(e.messages))
 
             except Exception, e:
-                if hasattr(e, 'response'):
-                    return e.response
-
-                # A real, non-expected exception.
-                # Handle the case where the full traceback is more helpful
-                # than the serialized error.
-                if settings.DEBUG and getattr(settings, 'TASTYPIE_FULL_DEBUG', False):
-                    raise
-
-                # Re-raise the error to get a proper traceback when the error
-                # happend during a test case
-                if request.META.get('SERVER_NAME') == 'testserver':
-                    raise
-
-                # Rather than re-raising, we're going to things similar to
-                # what Django does. The difference is returning a serialized
-                # error message.
                 return self._handle_500(request, e)
+                
 
         return wrapper
 
@@ -234,7 +218,26 @@ class Resource(object):
         method = getattr(self, '%s_%s' % (get_current_func_name(), get_request_class(request)))
         return method(request, exception)
 
-    def _handle_500_wsgirequest(self, request, exception):        
+    def _handle_500_wsgirequest(self, request, exception):
+                
+        if hasattr(exception, 'response'):
+            return exception.response
+
+        # A real, non-expected exception.
+        # Handle the case where the full traceback is more helpful
+        # than the serialized error.
+        if settings.DEBUG and getattr(settings, 'TASTYPIE_FULL_DEBUG', False):
+            raise
+
+        # Re-raise the error to get a proper traceback when the error
+        # happend during a test case
+        if request.META.get('SERVER_NAME') == 'testserver':
+            raise
+                
+        # Rather than re-raising, we're going to things similar to
+        # what Django does. The difference is returning a serialized
+        # error message.
+                
         import traceback
         import sys
         the_trace = '\n'.join(traceback.format_exception(*(sys.exc_info())))
@@ -1482,9 +1485,8 @@ class Resource(object):
         Should return a HttpResponse (200 OK).
         """
         self.method_check(request, allowed=['get'])
-        if  not (self.is_authenticated(request) and  self.throttle_check(request)):
-            return self.response_handler.get_unauthorized_request_response(request)
-                 
+        self.is_authenticated(request)
+        self.throttle_check(request)                 
         self.log_throttled_access(request)
         return self.create_response(request, self.build_schema())
 
