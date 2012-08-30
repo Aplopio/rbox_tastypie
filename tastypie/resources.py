@@ -524,9 +524,8 @@ class Resource(object):
             response['Allow'] = allows
             raise ImmediateResponse(response=response)
 
-        if not request_method in allowed:
-            
-            response = self.response_handler.get_method_notallowed_response(allows)
+        if not request_method in allowed:            
+            response = self.response_handler.get_method_notallowed_response(request, allows)
             response['Allow'] = allows
             raise ImmediateResponse(response=response)
 
