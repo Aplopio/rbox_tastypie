@@ -65,15 +65,13 @@ class ResponseHandler(object):
         method = getattr(self, '%s_%s' % (get_current_func_name(), get_request_class(request)))
         return method(request, location)
         
-    def get_not_implemented_response(self, request, *args, **kwargs):
-        method = getattr(self, 'return_not_implemented_%s' % get_request_class(request))
-        return method(request, *args, **kwargs)
-
-    def get_unauthorized_request_response(self, request):
-        method = getattr(self, 'return_not_implemented_%s' % get_request_class(request))
+    def get_not_implemented_response(self, request):
+        method = getattr(self, '%s_%s' % (get_current_func_name(), get_request_class(request)))
         return method(request)
-
         
+    def get_unauthorized_request_response(self, request):
+        method = getattr(self, '%s_%s' % (get_current_func_name(), get_request_class(request)))
+        return method(request)        
 
     def get_unauthorized_request_response_wsgirequest(self, request):
         return http.HttpUnauthorized()        
