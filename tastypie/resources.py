@@ -452,7 +452,7 @@ class Resource(object):
         method = getattr(self, "%s_%s" % (request_method, request_type), None)
 
         if method is None:
-            raise ImmediateResponse(response=self.response_handler.return_not_implemented(request))
+            raise ImmediateResponse(response=self.response_handler.get_not_implemented_response(request))
 
         self.is_authenticated(request)
         self.is_authorized(request)
