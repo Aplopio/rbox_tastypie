@@ -14,3 +14,10 @@ def get_request_class(request):
     return request.__class__.__name__.lower()
 
 
+def get_request_class_name_lowered(request_obj_or_class):
+    """Returns the class of request in lower case"""
+    if  isinstance(request_obj_or_class, type):
+        return request_obj_or_class.__name__.lower()
+    else:
+        return request_obj_or_class.__class__.__name__.lower()
+
