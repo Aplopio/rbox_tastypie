@@ -459,13 +459,13 @@ class RelatedField(ApiField):
         Instaniates the related resource.
         """
         related_resource = self.to_class()
-
+        
         # Fix the ``api_name`` if it's not present.
         if related_resource._meta.api_name is None:
             if self._resource and not self._resource._meta.api_name is None:
                 related_resource._meta.api_name = self._resource._meta.api_name
 
-        # Try to be efficient about DB queries.
+                                                            # Try to be efficient about DB queries.
         related_resource.instance = related_instance
         return related_resource
 

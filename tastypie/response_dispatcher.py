@@ -1,9 +1,6 @@
 from tastypie import http
 from django.http import HttpResponse
 from django.utils.cache import patch_cache_control
-from tastypie import response_router
-from django.core.handlers.wsgi import WSGIRequest
-
 
 class HttpResponseDispatcher(object):
     def get_unauthorized_request_response_wsgirequest(self):
@@ -63,4 +60,3 @@ class HttpResponseDispatcher(object):
     def get_not_implemented_response(self):
         return http.HttpNotImplemented()
 
-response_router[WSGIRequest] = HttpResponseDispatcher()

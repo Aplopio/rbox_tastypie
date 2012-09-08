@@ -5,7 +5,7 @@ import django
 from django.conf import settings
 from django.conf.urls.defaults import patterns, url
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError
-from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix
+from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
 from django.db import transaction
 from django.db.models.sql.constants import QUERY_TERMS, LOOKUP_SEP
 from django.http import HttpResponseNotFound, Http404
@@ -171,9 +171,10 @@ class Resource(object):
     """
     __metaclass__ = DeclarativeMetaclass
 
-    def __init__(self, api_name=None):
+    def __init__(self, api_name=None, parent_resource=None, parent_pk=None):
         self.fields = deepcopy(self.base_fields)
-
+        self.parent_resource=parent_resource
+        self.parent_pk = parent_pk
         if not api_name is None:
             self._meta.api_name = api_name
 
@@ -182,6 +183,19 @@ class Resource(object):
             return self.fields[name]
         raise AttributeError(name)
 
+    def resource_parent_uri_kwargs(self, parent_resource, parent_pk):
+        if not parent_resource:
+            return {}            
+        else:
+            kwargs = parent_resource.resource_parent_uri_kwargs(parent_resource.parent_resource,
+                                                              parent_resource.parent_pk)
+            kwargs.update({
+                '%s_resource_name'%parent_resource._meta.resource_name: parent_resource._meta.resource_name,
+                '%s_pk'%parent_resource._meta.resource_name: parent_pk    
+                
+            })
+            return kwargs
+            
     def wrap_view(self, view):
         """
         Wraps methods so they can be called in a more functional way as well
@@ -194,10 +208,10 @@ class Resource(object):
 
         @csrf_exempt
         def wrapper(request, *args, **kwargs):
+            
             try:
                 callback = getattr(self, view)
                 response = callback(request, *args, **kwargs)
-
                 response = self._meta.response_router_obj[request].handle_cache_control(request, response)
 
                 return response
@@ -490,7 +504,12 @@ class Resource(object):
                 del(kwargs_subset[key])
             except KeyError:
                 pass
-
+        for key, item in url_dict.iteritems():
+            if 'resource_name' in key or (key !='pk' and 'pk' in key):
+                try:
+                    del (kwargs_subset[key])
+                except KeyError:
+                    pass
         return kwargs_subset
 
     def method_check(self, request, allowed=None):
@@ -660,16 +679,16 @@ class Resource(object):
         If the ``bundle_or_obj`` argument is provided, it calls
         ``Resource.detail_uri_kwargs`` for additional bits to create
         """
+        
         kwargs = {
             'resource_name': self._meta.resource_name,
         }
 
         if self._meta.api_name is not None:
             kwargs['api_name'] = self._meta.api_name
-
         if bundle_or_obj is not None:
             kwargs.update(self.detail_uri_kwargs(bundle_or_obj))
-
+        kwargs.update(self.resource_parent_uri_kwargs(self.parent_resource, self.parent_pk))
         return kwargs
 
     def get_resource_uri(self, request, bundle_or_obj=None, **kwargs):
@@ -685,19 +704,20 @@ class Resource(object):
         Return the generated URI. If that URI can not be reversed (not found
         in the URLconf), it will return an empty string.
         """
-        #check for format
+
+         #check for format
         _format = self.determine_format(request)
         ##strip the "application" in "application/{format}"
         _format = _format.split('/')[1]
         
-        ##WARNING: if a method is not provided for your type will pass to default
+        ##WARNING: if a method is not provided for your type will pass to default<
         method = getattr(self, '%s_%s' % (get_current_func_name(), _format), self.get_resource_uri_default)
         return method(request, bundle_or_obj, **kwargs)
 
     def get_resource_uri_default(self, request, bundle_or_obj, url_name='api_dispatch_list', **kwargs):
         if bundle_or_obj is not None:
             url_name = 'api_dispatch_detail'
-
+        
         try:
             return self._build_reverse_url(url_name, kwargs=self.resource_uri_kwargs(bundle_or_obj))
         except NoReverseMatch:
@@ -740,10 +760,33 @@ class Resource(object):
         """
         # Dehydrate each field.
         for field_name, field_object in self.fields.items():
-            # A touch leaky but it makes URI resolution work.
+        # A touch leaky but it makes URI resolution work.
+            if getattr(field_object,'sub_resource_field', False):
+                continue
+                
             if getattr(field_object, 'dehydrated_type', None) == 'related':
                 field_object.api_name = self._meta.api_name
                 field_object.resource_name = self._meta.resource_name
+                
+            bundle.data[field_name] = field_object.dehydrate(bundle)
+
+                # Check for an optional method to do further dehydration.
+            method = getattr(self, "dehydrate_%s" % field_name, None)
+
+            if method:
+                bundle.data[field_name] = method(bundle)
+
+        for field_name, field_object in self.fields.items():
+            # A touch leaky but it makes URI resolution work.
+            if getattr(field_object,'sub_resource_field', False):
+                field_object.api_name = self._meta.api_name
+                field_object.resource_name = self._meta.resource_name
+                field_object.resource_obj = self
+                try:
+                    field_object.resource_pk = bundle.data["id"]
+                except KeyError:
+                    field_object.resource_pk = bundle.data["pk"]
+                    
 
             bundle.data[field_name] = field_object.dehydrate(bundle)
 
@@ -752,6 +795,7 @@ class Resource(object):
 
             if method:
                 bundle.data[field_name] = method(bundle)
+
 
         bundle = self.dehydrate(bundle)
         return bundle
@@ -1160,7 +1204,7 @@ class Resource(object):
         try:
             obj = self.cached_obj_get(request=request, **self.remove_api_resource_names(kwargs))
         except ObjectDoesNotExist:
-            return self. self._meta.response_router_obj[request].get_not_found_response()
+            return self._meta.response_router_obj[request].get_not_found_response()
         except MultipleObjectsReturned:
             return  self._meta.response_router_obj[request].get_multiple_choices_response("More than one resource is found at this URI.")
 
