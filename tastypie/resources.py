@@ -691,7 +691,7 @@ class Resource(object):
         kwargs.update(self.resource_parent_uri_kwargs(self.parent_resource, self.parent_pk))
         return kwargs
 
-    def get_resource_uri(self, request, bundle_or_obj=None, **kwargs):
+    def get_resource_uri(self, request=None, bundle_or_obj=None, **kwargs):
         """
         Handles generating a resource URI.
 
@@ -706,13 +706,17 @@ class Resource(object):
         """
 
          #check for format
-        _format = self.determine_format(request)
+        if request:
+            _format = self.determine_format(request)
         ##strip the "application" in "application/{format}"
-        _format = _format.split('/')[1]
+            _format = _format.split('/')[1]
         
         ##WARNING: if a method is not provided for your type will pass to default<
-        method = getattr(self, '%s_%s' % (get_current_func_name(), _format), self.get_resource_uri_default)
-        return method(request, bundle_or_obj, **kwargs)
+            method = getattr(self, '%s_%s' % (get_current_func_name(), _format), self.get_resource_uri_default)
+            return method(request, bundle_or_obj, **kwargs)
+        else:
+            return self.get_resource_uri_default(request, bundle_or_obj, **kwargs)
+            
 
     def get_resource_uri_default(self, request, bundle_or_obj, url_name='api_dispatch_list', **kwargs):
         if bundle_or_obj is not None:
