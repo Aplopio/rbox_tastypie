@@ -760,34 +760,11 @@ class Resource(object):
         """
         # Dehydrate each field.
         for field_name, field_object in self.fields.items():
-        # A touch leaky but it makes URI resolution work.
-            if getattr(field_object,'sub_resource_field', False):
-                continue
-                
+            # A touch leaky but it makes URI resolution work.
             if getattr(field_object, 'dehydrated_type', None) == 'related':
                 field_object.api_name = self._meta.api_name
                 field_object.resource_name = self._meta.resource_name
-                
-            bundle.data[field_name] = field_object.dehydrate(bundle)
-
-                # Check for an optional method to do further dehydration.
-            method = getattr(self, "dehydrate_%s" % field_name, None)
-
-            if method:
-                bundle.data[field_name] = method(bundle)
-
-        for field_name, field_object in self.fields.items():
-            # A touch leaky but it makes URI resolution work.
-            if getattr(field_object,'sub_resource_field', False):
-                field_object.api_name = self._meta.api_name
-                field_object.resource_name = self._meta.resource_name
                 field_object.resource_obj = self
-                try:
-                    field_object.resource_pk = bundle.data["id"]
-                except KeyError:
-                    field_object.resource_pk = bundle.data["pk"]
-                    
-
             bundle.data[field_name] = field_object.dehydrate(bundle)
 
             # Check for an optional method to do further dehydration.
@@ -795,8 +772,7 @@ class Resource(object):
 
             if method:
                 bundle.data[field_name] = method(bundle)
-
-
+                
         bundle = self.dehydrate(bundle)
         return bundle
 
