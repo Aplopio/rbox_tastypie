@@ -3,7 +3,7 @@ from django.http import HttpResponse
 from django.utils.cache import patch_cache_control
 
 class HttpResponseDispatcher(object):
-    def get_unauthorized_request_response_wsgirequest(self):
+    def get_unauthorized_request_response(self):
         return http.HttpUnauthorized()        
             
     def get_application_error_class(self):
