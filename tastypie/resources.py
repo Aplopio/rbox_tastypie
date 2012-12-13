@@ -1327,7 +1327,7 @@ class Resource(object):
             else:
                 updated_bundle = self.full_dehydrate(updated_bundle)
                 updated_bundle = self.alter_detail_data_to_serialize(request, updated_bundle)
-                response_class = self.response_class.get_accepted_response_class(request)
+                response_class = self._meta.response_router_obj[request].get_accepted_response_class()
                 return self.create_response(request, updated_bundle, response_class=response_class)
         except (NotFound, MultipleObjectsReturned):
             updated_bundle = self.obj_create(bundle, request=request, **self.remove_api_resource_names(kwargs))
