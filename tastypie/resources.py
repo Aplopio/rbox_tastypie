@@ -356,7 +356,8 @@ class Resource(object):
         
         for field in sub_resource_field_list:
             sub_resource_cls = field.to
-            sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self, parent_pk=pk, parent_obj=parent_obj, parent_field=field)
+            sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self, 
+                    parent_pk=pk, parent_obj=parent_obj, parent_field=field.attribute)
             sub_resource_obj._meta.queryset = getattr(parent_obj, '%s' % field.attribute).all()
             resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
             try:
