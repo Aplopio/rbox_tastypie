@@ -184,10 +184,12 @@ class Resource(object):
     """
     __metaclass__ = DeclarativeMetaclass
 
-    def __init__(self, api_name=None, parent_resource=None, parent_pk=None):
+    def __init__(self, api_name=None, parent_resource=None, parent_pk=None, parent_obj=None, parent_field=None):
         self.fields = deepcopy(self.base_fields)
         self.parent_resource=parent_resource
         self.parent_pk = parent_pk
+        self.parent_obj = parent_obj
+        self.parent_field = parent_field
         if not api_name is None:
             self._meta.api_name = api_name
 
@@ -354,7 +356,7 @@ class Resource(object):
         
         for field in sub_resource_field_list:
             sub_resource_cls = field.to
-            sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self, parent_pk=pk)
+            sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self, parent_pk=pk, parent_obj=parent_obj, parent_field=field)
             sub_resource_obj._meta.queryset = getattr(parent_obj, '%s' % field.attribute).all()
             resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
             try:
