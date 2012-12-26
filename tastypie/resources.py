@@ -234,7 +234,7 @@ class Resource(object):
                 return self._meta.response_router_obj[request].get_bad_request_response(e.args[0])
 
             except ValidationError, e:
-                return  self._meta.response_router_obj[request].get_bad_request_response(request, ', '.join(e.messages))
+                return  self._meta.response_router_obj[request].get_bad_request_response(', '.join(e.messages))
 
             except Exception, e:
                 return self._handle_500(request, e)
@@ -1176,7 +1176,7 @@ class Resource(object):
             desired_format = self._meta.default_format
 
         serialized = self.serialize(request, errors, desired_format)
-        response =  self._meta.response_router_obj[request].get_bad_request_response(content=serialized, content_type=build_content_type(desired_format))
+        response =  self._meta.response_router_obj[request].get_bad_request_response(content=serialized)#, content_type=build_content_type(desired_format))
         raise ImmediateResponse(response=response)
 
     def is_valid(self, bundle, request=None):
