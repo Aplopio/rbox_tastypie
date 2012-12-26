@@ -623,7 +623,7 @@ class Resource(object):
         auth_result = self._meta.authorization.is_authorized(request, object)
 
         if not auth_result is True:
-            return  self._meta.response_router_obj[request].get_unauthorized_request_response()
+            raise ImmediateResponse(self._meta.response_router_obj[request].get_unauthorized_request_response())
 
 
     def is_authenticated(self, request):
@@ -637,8 +637,7 @@ class Resource(object):
         # Authenticate the request as needed.
         auth_result = self._meta.authentication.is_authenticated(request)
         if not auth_result is True:
-            return  self._meta.response_router_obj[request].get_unauthorized_request_response()
-
+            raise ImmediateResponse(self._meta.response_router_obj[request].get_unauthorized_request_response())
 
     def throttle_check(self, request):
         """
