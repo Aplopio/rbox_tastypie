@@ -375,7 +375,7 @@ class Resource(object):
         sub_resource_field_list = []
         url_list = []
         for name, field in self.fields.items():
-            if isinstance(field, fields.SubResourceField):
+            if isinstance(field, fields.BaseSubResourceField):
                 sub_resource_field_list.append(field)
         if len(sub_resource_field_list) > 0:
             url_list += [
@@ -385,9 +385,8 @@ class Resource(object):
             ]
         
         for name, field in self.fields.items():            
-            if isinstance(field, fields.SubResourceField):
+            if isinstance(field, fields.BaseSubResourceField):
                 include_urls = include(field.to(api_name=self._meta.api_name).urls)
-
                 url_list += [url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w[\w-]*)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls)]
         return url_list                
 
@@ -2152,6 +2151,9 @@ class ModelResource(Resource):
                 continue
 
             if getattr(field_object, 'is_m2m', False):
+                continue
+
+            if field_object.readonly:
                 continue
 
             if not field_object.attribute:
