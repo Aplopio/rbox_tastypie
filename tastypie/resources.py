@@ -358,7 +358,10 @@ class Resource(object):
             sub_resource_cls = field.to
             sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self, 
                     parent_pk=pk, parent_obj=parent_obj, parent_field=field.attribute)
-            sub_resource_obj._meta.queryset = getattr(parent_obj, '%s' % field.attribute).all()
+            try:
+                sub_resource_obj._meta.queryset = getattr(parent_obj, '%s' % field.attribute).all()
+            except AttributeError: #Happens when this is ToOneSubResourceField
+                sub_resource_obj._meta.queryset = []
             resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
             try:
                 if rest_of_url[-1] != '/':
