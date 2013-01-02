@@ -361,7 +361,7 @@ class Resource(object):
             try:
                 sub_resource_obj._meta.queryset = getattr(parent_obj, '%s' % field.attribute).all()
             except AttributeError: #Happens when this is ToOneSubResourceField
-                sub_resource_obj._meta.queryset = []
+                sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.none()
             resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
             try:
                 if rest_of_url[-1] != '/':
