@@ -7,8 +7,9 @@ from django.conf.urls.defaults import patterns, url, include
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError
 from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
 from django.db import transaction
-from django.db.models.sql.constants import QUERY_TERMS, LOOKUP_SEP
-from django.http import HttpResponseNotFound, Http404
+from django.db.models.sql.constants import QUERY_TERMS
+from django.http import HttpResponse, HttpResponseNotFound, Http404
+from django.utils.cache import patch_cache_control, patch_vary_headers
 from tastypie.authentication import Authentication
 from tastypie.authorization import ReadOnlyAuthorization
 from tastypie.bundle import Bundle
@@ -43,6 +44,12 @@ try:
 except ImportError:
     def csrf_exempt(func):
         return func
+
+# Django 1.5 has moved this constant up one level.
+try:
+    from django.db.models.constants import LOOKUP_SEP
+except ImportError:
+    from django.db.models.sql.constants import LOOKUP_SEP
 
 
 class NOT_AVAILABLE:
@@ -227,7 +234,26 @@ class Resource(object):
             try:
                 callback = getattr(self, view)
                 response = callback(request, *args, **kwargs)
-                response = self._meta.response_router_obj[request].handle_cache_control(request, response)
+
+                # Our response can vary based on a number of factors, use
+                # the cache class to determine what we should ``Vary`` on so
+                # caches won't return the wrong (cached) version.
+                varies = getattr(self._meta.cache, "varies", [])
+
+                if varies:
+                    response = self._meta.response_router_obj[request].handle_vary_headers(response,varies)
+
+                if self._meta.cache.cacheable(request, response):
+                    if self._meta.cache.cache_control():
+                        # If the request is cacheable and we have a
+                        # ``Cache-Control`` available then patch the header.
+                        response = self._meta.response_router_obj[request].handle_cache_control(response, **self._meta.cache.cache_control())
+
+                if request.is_ajax() and not response.has_header("Cache-Control"):
+                    # IE excessively caches XMLHttpRequests, so we're disabling
+                    # the browser cache here.
+                    # See http://www.enhanceie.com/ie/bugs.asp for details.
+                    response = self._meta.response_router_obj[request].handle_cache_control(response, no_cache=True)
 
                 return response
             except (BadRequest, fields.ApiFieldError), e:
@@ -1232,8 +1258,8 @@ class Resource(object):
         to_be_serialized = paginator.page()
 
         # Dehydrate the bundles in preparation for serialization.
-        bundles = [self.build_bundle(obj=obj, request=request) for obj in to_be_serialized['objects']]
-        to_be_serialized['objects'] = [self.full_dehydrate(bundle) for bundle in bundles]
+        bundles = [self.build_bundle(obj=obj, request=request) for obj in to_be_serialized[self._meta.collection_name]]
+        to_be_serialized[self._meta.collection_name] = [self.full_dehydrate(bundle) for bundle in bundles]
         to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
         return self.create_response(request, to_be_serialized)
 
@@ -1274,12 +1300,12 @@ class Resource(object):
         deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
         deserialized = self.alter_deserialized_list_data(request, deserialized)
 
-        if not 'objects' in deserialized:
+        if not self._meta.collection_name in deserialized:
             raise BadRequest("Invalid data sent.")
         self.obj_delete_list(request=request, **self.remove_api_resource_names(kwargs))
         bundles_seen = []
 
-        for object_data in deserialized['objects']:
+        for object_data in deserialized[self._meta.collection_name]:
             bundle = self.build_bundle(data=dict_strip_unicode_keys(object_data), request=request)
 
             # Attempt to be transactional, deleting any previously created
@@ -1295,7 +1321,7 @@ class Resource(object):
             return  self._meta.response_router_obj[request].get_no_content_response()
         else:
             to_be_serialized = {}
-            to_be_serialized['objects'] = [self.full_dehydrate(bundle) for bundle in bundles_seen]
+            to_be_serialized[self._meta.collection_name] = [self.full_dehydrate(bundle) for bundle in bundles_seen]
             to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
             response_class =  self._meta.response_router_obj[request].get_accepted_response_class()
             return self.create_response(request, to_be_serialized, response_class=response_class)
@@ -1458,17 +1484,22 @@ class Resource(object):
             **must** have ``delete`` in your :ref:`detail-allowed-methods`
             setting.
 
+        Substitute appropriate names for ``objects`` and
+        ``deleted_objects`` if ``Meta.collection_name`` is set to something
+        other than ``objects`` (default).
         """
         request = convert_post_to_patch(request)
         deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
 
-        if "objects" not in deserialized:
-            raise BadRequest("Invalid data sent.")
+        collection_name = self._meta.collection_name
+        deleted_collection_name = 'deleted_%s' % collection_name
+        if collection_name not in deserialized:
+            raise BadRequest("Invalid data sent: missing '%s'" % collection_name)
 
-        if len(deserialized["objects"]) and 'put' not in self._meta.detail_allowed_methods:
+        if len(deserialized[collection_name]) and 'put' not in self._meta.detail_allowed_methods:
             raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response())
 
-        for data in deserialized["objects"]:
+        for data in deserialized[collection_name]:
             # If there's a resource_uri then this is either an
             # update-in-place or a create-via-PUT.
             if "resource_uri" in data:
@@ -1495,12 +1526,14 @@ class Resource(object):
                 bundle = self.build_bundle(data=dict_strip_unicode_keys(data), request=request)
                 self.obj_create(bundle, request=request)
 
-        if len(deserialized.get('deleted_objects', [])) and 'delete' not in self._meta.detail_allowed_methods:
-            raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response())
+        deleted_collection = deserialized.get(deleted_collection_name, [])
+        if deleted_collection:
+            if 'delete' not in self._meta.detail_allowed_methods:
+                raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response())
 
-        for uri in deserialized.get('deleted_objects', []):
-            obj = self.get_via_uri(uri, request=request)
-            self.obj_delete(request=request, _obj=obj)
+            for uri in deleted_collection:
+                obj = self.get_via_uri(uri, request=request)
+                self.obj_delete(request=request, _obj=obj)
 
         return  self._meta.response_router_obj[request].get_accepted_response_class()()
 
@@ -1607,7 +1640,7 @@ class Resource(object):
                 not_found.append(identifier)
 
         object_list = {
-            'objects': objects,
+            self._meta.collection_name: objects,
         }
 
         if len(not_found):
@@ -1861,7 +1894,7 @@ class ModelResource(Resource):
 
         qs_filters = {}
 
-        if hasattr(self._meta, 'queryset'):
+        if getattr(self._meta, 'queryset', None) is not None:
             # Get the possible query terms from the current QuerySet.
             if hasattr(self._meta.queryset.query.query_terms, 'keys'):
                 # Django 1.4 & below compatibility.
@@ -1870,7 +1903,12 @@ class ModelResource(Resource):
                 # Django 1.5+.
                 query_terms = self._meta.queryset.query.query_terms
         else:
-            query_terms = QUERY_TERMS.keys()
+            if hasattr(QUERY_TERMS, 'keys'):
+                # Django 1.4 & below compatibility.
+                query_terms = QUERY_TERMS.keys()
+            else:
+                # Django 1.5+.
+                query_terms = QUERY_TERMS
 
         for filter_expr, value in filters.items():
             filter_bits = filter_expr.split(LOOKUP_SEP)
@@ -2035,26 +2073,52 @@ class ModelResource(Resource):
         self.save_m2m(m2m_bundle)
         return bundle
 
+    def lookup_kwargs_with_identifiers(self, bundle, kwargs):
+        """
+        Kwargs here represent uri identifiers Ex: /repos/<user_id>/<repo_name>/
+        We need to turn those identifiers into Python objects for generating
+        lookup parameters that can find them in the DB
+        """
+        lookup_kwargs = {}
+        bundle.obj = self.get_object_list(bundle.request).model()
+        # Override data values, we rely on uri identifiers
+        bundle.data.update(kwargs)
+        # We're going to manually hydrate, as opposed to calling
+        # ``full_hydrate``, to ensure we don't try to flesh out related
+        # resources & keep things speedy.
+        bundle = self.hydrate(bundle)
+
+        for identifier in kwargs:
+            if identifier == self._meta.detail_uri_name:
+                lookup_kwargs[identifier] = kwargs[identifier]
+                continue
+
+            field_object = self.fields[identifier]
+
+            # Skip readonly or related fields.
+            if field_object.readonly is True or getattr(field_object, 'is_related', False):
+                continue
+
+            # Check for an optional method to do further hydration.
+            method = getattr(self, "hydrate_%s" % identifier, None)
+
+            if method:
+                bundle = method(bundle)
+
+            if field_object.attribute:
+                value = field_object.hydrate(bundle)
+
+            lookup_kwargs[identifier] = value
+
+        return lookup_kwargs
+
     def obj_update(self, bundle, request=None, skip_errors=False, **kwargs):
         """
         A ORM-specific implementation of ``obj_update``.
         """
         if not bundle.obj or not self.get_bundle_detail_data(bundle):
-            # Attempt to hydrate data from kwargs before doing a lookup for the object.
-            # This step is needed so certain values (like datetime) will pass model validation.
             try:
-                bundle.obj = self.get_object_list(bundle.request).model()
-                bundle.data.update(kwargs)
-                bundle = self.full_hydrate(bundle)
-                lookup_kwargs = kwargs.copy()
-
-                for key in kwargs.keys():
-                    if key == self._meta.detail_uri_name:
-                        continue
-                    elif getattr(bundle.obj, key, NOT_AVAILABLE) is not NOT_AVAILABLE:
-                        lookup_kwargs[key] = getattr(bundle.obj, key)
-                    else:
-                        del lookup_kwargs[key]
+                lookup_kwargs = self.lookup_kwargs_with_identifiers(bundle, kwargs)
             except:
                 # if there is trouble hydrating the data, fall back to just
                 # using kwargs by itself (usually it only contains a "pk" key
@@ -2162,6 +2226,9 @@ class ModelResource(Resource):
             if not field_object.attribute:
                 continue
 
+            if field_object.readonly:
+                continue
+
             if field_object.blank and not bundle.data.has_key(field_name):
                 continue
 
@@ -2222,7 +2289,7 @@ class ModelResource(Resource):
             for related_bundle in bundle.data[field_name]:
                 related_bundle.obj.save()
                 related_objs.append(related_bundle.obj)
-
+            import ipdb; ipdb.set_trace();
             related_mngr.add(*related_objs)
 
     def detail_uri_kwargs(self, bundle_or_obj):

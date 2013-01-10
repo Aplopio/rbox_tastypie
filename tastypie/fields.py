@@ -247,6 +247,14 @@ class DecimalField(ApiField):
 
         return Decimal(value)
 
+    def hydrate(self, bundle):
+        value = super(DecimalField, self).hydrate(bundle)
+
+        if value and not isinstance(value, Decimal):
+            value = Decimal(value)
+
+        return value
+
 
 class BooleanField(ApiField):
     """
@@ -454,7 +462,7 @@ class RelatedField(ApiField):
         if self.self_referential or self.to == 'self':
             self._to_class = cls
 
-    def get_related_resource(self, bundle, related_instance):
+    def get_related_resource(self, related_instance, bundle=None):
         """
         Instaniates the related resource.
         """
@@ -642,7 +650,7 @@ class ToOneField(RelatedField):
 
             return None
 
-        self.fk_resource = self.get_related_resource(bundle, foreign_obj)
+        self.fk_resource = self.get_related_resource(foreign_obj, bundle)
         fk_bundle = Bundle(obj=foreign_obj, request=bundle.request)
         return self.dehydrate_related(fk_bundle, self.fk_resource)
 
@@ -731,7 +739,7 @@ class ToManyField(RelatedField):
         # TODO: Also model-specific and leaky. Relies on there being a
         #       ``Manager`` there.
         for m2m in the_m2ms.all():
-            m2m_resource = self.get_related_resource(bundle, m2m)
+            m2m_resource = self.get_related_resource(m2m, bundle)
             m2m_bundle = Bundle(obj=m2m, request=bundle.request)
             self.m2m_resources.append(m2m_resource)
             m2m_dehydrated.append(self.dehydrate_related(m2m_bundle, m2m_resource))
@@ -787,11 +795,12 @@ class OneToManyField(ToManyField):
 
 class BaseSubResourceField(object):
 
-    def get_related_resource(self, bundle, related_instance=None):
+    def get_related_resource(self, related_instance=None, bundle=None):
         """
         Instaniates the related resource.
         """
         resource_obj = getattr(self, 'resource_obj')
+        assert bundle is not None
         resource_pk = bundle.obj.pk
         related_resource = self.to_class(api_name=self.api_name, parent_resource=resource_obj, parent_pk=resource_pk)
         
@@ -803,8 +812,6 @@ class BaseSubResourceField(object):
                 
         if related_instance:
             related_resource.instance = related_instance
-
-
         return related_resource
 
 class ToOneSubResourceField(BaseSubResourceField, ToOneField):

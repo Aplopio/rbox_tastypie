@@ -1,6 +1,7 @@
 from tastypie import http
 from django.http import HttpResponse
-from django.utils.cache import patch_cache_control
+from django.utils.cache import patch_cache_control, patch_vary_headers
+
 
 class HttpResponseDispatcher(object):
     def get_unauthorized_request_response(self):
@@ -15,13 +16,15 @@ class HttpResponseDispatcher(object):
     def get_unauthorized_response_class(self):
         return http.HttpUnauthorized
 
-    def handle_cache_control(self, request, response):    
-        if request.is_ajax() and not response.has_header("Cache-Control"):
-            # IE excessively caches XMLHttpRequests, so we're disabling
-            # the browser cache here.
-            # See http://www.enhanceie.com/ie/bugs.asp for details.
-            patch_cache_control(response, no_cache=True)
+    def handle_cache_control(self, response, **kwargs):
+        # IE excessively caches XMLHttpRequests, so we're disabling
+        # the browser cache here.
+        # See http://www.enhanceie.com/ie/bugs.asp for details.
+        patch_cache_control(response, **kwargs)
+        return response
 
+    def handle_vary_headers(self, response, varies):
+        patch_vary_headers(response, varies)
         return response
 
     def get_default_response_class(self):
