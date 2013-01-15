@@ -2232,6 +2232,8 @@ class ModelResource(Resource):
             if field_object.blank and not bundle.data.has_key(field_name):
                 continue
 
+            field_object.save(bundle)
+            '''
             # Get the object.
             try:
                 related_obj = getattr(bundle.obj, field_object.attribute)
@@ -2248,6 +2250,7 @@ class ModelResource(Resource):
 
                 related_obj.save()
                 setattr(bundle.obj, field_object.attribute, related_obj)
+            '''
 
     def save_m2m(self, bundle):
         """
@@ -2268,7 +2271,9 @@ class ModelResource(Resource):
 
             if field_object.readonly:
                 continue
-
+            field_object.save(bundle)
+    
+            '''
             # Get the manager.
             related_mngr = None
 
@@ -2289,8 +2294,8 @@ class ModelResource(Resource):
             for related_bundle in bundle.data[field_name]:
                 related_bundle.obj.save()
                 related_objs.append(related_bundle.obj)
-            import ipdb; ipdb.set_trace();
             related_mngr.add(*related_objs)
+            '''
 
     def detail_uri_kwargs(self, bundle_or_obj):
         """

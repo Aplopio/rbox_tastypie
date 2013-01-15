@@ -584,7 +584,7 @@ class RelatedField(ApiField):
         Accepts either a URI, a data dictionary (or dictionary-like structure)
         or an object with a ``pk``.
         """
-
+        import ipdb; ipdb.set_trace();
         self.fk_resource = self.to_class()
         kwargs = {
             'request': request,
@@ -661,6 +661,26 @@ class ToOneField(RelatedField):
             return value
 
         return self.build_related_resource(value, request=bundle.request)
+
+    
+    def save(self, bundle):
+        # Get the object.
+        try:
+            related_obj = getattr(bundle.obj, self.attribute)
+        except ObjectDoesNotExist:
+            related_obj = None
+
+        # Because sometimes it's ``None`` & that's OK.
+        if related_obj:
+            if self.related_name:
+                if not self._resource.get_bundle_detail_data(bundle):
+                    bundle.obj.save()
+
+                setattr(related_obj, self.related_name, bundle.obj)
+
+            related_obj.save()
+            setattr(bundle.obj, self.attribute, related_obj)
+        return bundle
 
 class ForeignKey(ToOneField):
     """
@@ -778,6 +798,41 @@ class ToManyField(RelatedField):
             m2m_hydrated.append(self.build_related_resource(value, **kwargs))
 
         return m2m_hydrated
+
+
+    def get_related_mngr(self, bundle):
+        related_mngr = None
+        if isinstance(self.attribute, basestring):
+            related_mngr = getattr(bundle.obj, self.attribute)
+        elif callable(self.attribute):
+            related_mngr = self.attribute(bundle)
+
+        return related_mngr
+
+    def get_related_objs(self, bundle):
+        related_objs = []
+
+        for related_bundle in bundle.data[self.instance_name]:
+            related_bundle.obj.save()
+            related_objs.append(related_bundle.obj)
+        return related_objs 
+
+
+    def save(self, bundle):
+        related_mngr = self.get_related_mngr(bundle)
+        if not related_mngr:
+            return
+
+        related_objs = self.get_related_objs(bundle)
+
+        for obj in related_mngr.all():
+            if obj not in related_objs:
+                related_mngr.remove(obj)
+
+        for obj in related_objs:
+            if obj not in related_mngr.all():
+                related_mngr.add(obj)
+
 
 
 class ManyToManyField(ToManyField):
