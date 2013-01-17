@@ -705,7 +705,7 @@ class ToOneField(RelatedField):
     def save(self, bundle):
         # Get the object.
         try:
-            related_obj = getattr(bundle.obj, self.attribute)
+            related_obj = getattr(bundle.obj, self.attribute, None)
         except ObjectDoesNotExist:
             related_obj = None
 

@@ -913,12 +913,15 @@ class Resource(object):
                     if not getattr(field_object, 'is_related', False):
                         setattr(bundle.obj, field_object.attribute, value)
                     elif not getattr(field_object, 'is_m2m', False):
+                        '''
+                        Changed the order of the follwing elif conditions to allow a fk field that can be blank to be set to a null value
+                        '''
                         if value is not None:
                             setattr(bundle.obj, field_object.attribute, value.obj)
-                        elif field_object.blank:
-                            continue
                         elif field_object.null:
                             setattr(bundle.obj, field_object.attribute, value)
+                        elif field_object.blank:
+                            continue
 
         return bundle
 
@@ -2228,7 +2231,6 @@ class ModelResource(Resource):
 
             if field_object.readonly:
                 continue
-
             if field_object.blank and not bundle.data.has_key(field_name):
                 continue
 
