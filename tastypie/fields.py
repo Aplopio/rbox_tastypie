@@ -3,6 +3,7 @@ from dateutil.parser import parse
 from decimal import Decimal
 import re
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django import forms as djangoform
 from django.utils import datetime_safe, importlib
 from tastypie.bundle import Bundle
 from tastypie.exceptions import ApiFieldError, NotFound
@@ -68,6 +69,10 @@ class ApiField(object):
 
         if help_text:
             self.help_text = help_text
+
+    @property
+    def formfield(self):
+        return djangoform.CharField
 
     def contribute_to_class(self, cls, name):
         # Do the least we can here so that we don't hate ourselves in the
@@ -191,6 +196,10 @@ class FileField(ApiField):
     dehydrated_type = 'string'
     help_text = 'A file URL as a string. Ex: "http://media.example.com/media/photos/my_photo.jpg"'
 
+    @property
+    def formfield(self):
+        return djangoform.FileField
+
     def convert(self, value):
         if value is None:
             return None
@@ -213,6 +222,10 @@ class IntegerField(ApiField):
     dehydrated_type = 'integer'
     help_text = 'Integer data. Ex: 2673'
 
+    @property
+    def formfield(self):
+        return djangoform.IntegerField
+
     def convert(self, value):
         if value is None:
             return None
@@ -227,6 +240,10 @@ class FloatField(ApiField):
     dehydrated_type = 'float'
     help_text = 'Floating point numeric data. Ex: 26.73'
 
+    @property
+    def formfield(self):
+        return djangoform.FloatField
+
     def convert(self, value):
         if value is None:
             return None
@@ -240,6 +257,10 @@ class DecimalField(ApiField):
     """
     dehydrated_type = 'decimal'
     help_text = 'Fixed precision numeric data. Ex: 26.73'
+
+    @property
+    def formfield(self):
+        return djangoform.DecimalField
 
     def convert(self, value):
         if value is None:
@@ -264,6 +285,10 @@ class BooleanField(ApiField):
     """
     dehydrated_type = 'boolean'
     help_text = 'Boolean data. Ex: True'
+
+    @property
+    def formfield(self):
+        return djangoform.BooleanField
 
     def convert(self, value):
         if value is None:
@@ -307,6 +332,10 @@ class DateField(ApiField):
     dehydrated_type = 'date'
     help_text = 'A date as a string. Ex: "2010-11-10"'
 
+    @property
+    def formfield(self):
+        return djangoform.DateField
+
     def convert(self, value):
         if value is None:
             return None
@@ -344,6 +373,10 @@ class DateTimeField(ApiField):
     """
     dehydrated_type = 'datetime'
     help_text = 'A date & time as a string. Ex: "2010-11-10T03:07:43"'
+
+    @property
+    def formfield(self):
+        return djangoform.CharField
 
     def convert(self, value):
         if value is None:
@@ -393,6 +426,13 @@ class RelatedField(ApiField):
     is_related = True
     self_referential = False
     help_text = 'A related resource. Can be either a URI or set of nested resource data.'
+    
+    @property
+    def formfield(self):
+        if hasattr(self,'is_m2m') and  self.is_m2m:
+            return djangoform.MultipleChoiceField
+        else:
+            return djangoform.ChoiceField
 
     def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, full=False, unique=False, help_text=None, uri_cls_list=None):
         """
@@ -863,7 +903,7 @@ class BaseSubResourceField(object):
         if related_resource._meta.api_name is None:
             if self._resource and not self._resource._meta.api_name is None:
                 related_resource._meta.api_name = self._resource._meta.api_name
-                
+
         if related_instance:
             related_resource.instance = related_instance
         return related_resource
