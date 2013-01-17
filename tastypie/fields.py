@@ -584,8 +584,7 @@ class RelatedField(ApiField):
         Accepts either a URI, a data dictionary (or dictionary-like structure)
         or an object with a ``pk``.
         """
-        import ipdb; ipdb.set_trace();
-        self.fk_resource = self.to_class()
+        self.fk_resource = self.get_related_resource(related_obj)
         kwargs = {
             'request': request,
             'related_obj': related_obj,
