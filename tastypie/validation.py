@@ -1,6 +1,7 @@
 from django.core.exceptions import ImproperlyConfigured
 from django.forms import ModelForm
 from django.forms.models import model_to_dict
+from django.utils import importlib
 
 
 class Validation(object):
@@ -39,8 +40,38 @@ class FormValidation(Validation):
         if not 'form_class' in kwargs:
             raise ImproperlyConfigured("You must provide a 'form_class' to 'FormValidation' classes.")
 
-        self.form_class = kwargs.pop('form_class')
+        self._form_class = kwargs.pop('form_class')
         super(FormValidation, self).__init__(**kwargs)
+
+    @property
+    def form_class(self):
+        # We need to be lazy here, because when the metaclass constructs the
+        # Resources, other classes may not exist yet.
+        # That said, memoize this so we never have to relookup/reimport.
+        if hasattr(self,'_to_class') and issubclass(self._to_class, ModelForm):
+            return self._to_class
+
+        if type(self._form_class)==type and issubclass(self._form_class, ModelForm):
+            self._to_class =  self._form_class
+            return self._to_class
+
+        # It's a string. Let's figure it out.
+        if '.' in self._form_class:
+            # Try to import.
+            module_bits = self._form_class.split('.')
+            module_path, class_name = '.'.join(module_bits[:-1]), module_bits[-1]
+            module = importlib.import_module(module_path)
+        else:
+            # We've got a bare class name here, which won't work (No AppCache
+            # to rely on). Try to throw a useful error.
+            raise ImportError("Tastypie requires a Python-style path (<module.module.Class>) to lazy load related resources. Only given '%s'." % self._form_class)
+
+        self._to_class = getattr(module, class_name, None)
+
+        if self._to_class is None:
+            raise ImportError("Module '%s' does not appear to have a class called '%s'." % (module_path, class_name))
+
+        return self._to_class
 
     def form_args(self, bundle):
         data = bundle.data
@@ -52,7 +83,7 @@ class FormValidation(Validation):
         kwargs = {'data': {}}
 
         if hasattr(bundle.obj, 'pk'):
-            if issubclass(self.form_class, ModelForm):
+            if issubclass(self.form_class, ModelForm) or issubclass(self.form_class, basestring):
                 kwargs['instance'] = bundle.obj
 
             kwargs['data'] = model_to_dict(bundle.obj)
