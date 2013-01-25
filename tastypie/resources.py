@@ -234,7 +234,6 @@ class Resource(object):
             try:
                 callback = getattr(self, view)
                 response = callback(request, *args, **kwargs)
-
                 # Our response can vary based on a number of factors, use
                 # the cache class to determine what we should ``Vary`` on so
                 # caches won't return the wrong (cached) version.
@@ -295,13 +294,13 @@ class Resource(object):
         import traceback
         import sys
         the_trace = '\n'.join(traceback.format_exception(*(sys.exc_info())))
-        response_class = http.HttpApplicationError
+        response_class = self._meta.response_router_obj[request].get_application_error_class()
         response_code = 500
 
         NOT_FOUND_EXCEPTIONS = (NotFound, ObjectDoesNotExist, Http404)
 
         if isinstance(exception, NOT_FOUND_EXCEPTIONS):
-            response_class = HttpResponseNotFound
+            response_class = self._meta.response_router_obj[request].get_response_notfound_class()
             response_code = 404
 
         if settings.DEBUG:
@@ -334,7 +333,7 @@ class Resource(object):
 
         # Prep the data going out.
         data = {
-            "error_message": getattr(settings, 'TASTYPIE_CANNED_ERROR', "Sorry, this request could not be processed. Please try again later."),
+            "error_message":getattr(settings, 'TASTYPIE_CANNED_ERROR', "Sorry, this request could not be processed. Please try again later."),
         }
         desired_format = self.determine_format(request)
         serialized = self.serialize(request, data, desired_format)
@@ -375,6 +374,12 @@ class Resource(object):
         sub_resource_field_list = kwargs.pop('%s_sub_resource_field_list'%self._meta.resource_name)
         rest_of_url = kwargs.pop('%s_rest_of_url'%self._meta.resource_name)
         pk = kwargs.pop('pk')
+
+        self.is_authenticated(request)
+        self.is_authorized(request)
+        self.throttle_check(request)
+
+
         try:
             parent_obj = self.obj_get(request=request, **{'pk':pk})
         except Exception:
@@ -558,7 +563,7 @@ class Resource(object):
 
         if method is None:
             raise ImmediateResponse(response= self._meta.response_router_obj[request].get_not_implemented_response())
-
+        
         self.is_authenticated(request)
         self.is_authorized(request)
         self.throttle_check(request)
