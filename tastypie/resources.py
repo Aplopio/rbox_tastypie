@@ -653,7 +653,7 @@ class Resource(object):
         the authorization backend can apply additional row-level permissions
         checking.
         """
-        auth_result = self._meta.authorization.is_authorized(request, object)
+        auth_result = self._meta.authorization.is_authorized(request, object, parent_object=self.parent_object)
 
         if not auth_result is True:
             raise ImmediateResponse(self._meta.response_router_obj[request].get_unauthorized_request_response())
@@ -717,7 +717,7 @@ class Resource(object):
         if obj is None:
             obj = self._meta.object_class()
 
-        return Bundle(obj=obj, data=data, request=request)
+        return Bundle(obj=obj, data=data, request=request, parent_obj=self.parent_obj)
 
     def build_filters(self, filters=None):
         """
@@ -1530,10 +1530,15 @@ class Resource(object):
             else:
                 # There's no resource URI, so this is a create call just
                 # like a POST to the list resource.
+                
+                '''
+                #Dropping support for creation on patch. Not easy to check authorization. 
+                #User may have edit permission to existing objects but no permission to create new objects
+
                 data = self.alter_deserialized_detail_data(request, data)
                 bundle = self.build_bundle(data=dict_strip_unicode_keys(data), request=request)
                 self.obj_create(bundle, request=request)
-
+                '''
         deleted_collection = deserialized.get(deleted_collection_name, [])
         if deleted_collection:
             if 'delete' not in self._meta.detail_allowed_methods:
@@ -1569,7 +1574,6 @@ class Resource(object):
         except MultipleObjectsReturned:
             content = "More than one resource is found at this URI."
             return  self._meta.response_router_obj[request].get_multiple_choices_response(content)
-
 
         bundle = self.build_bundle(obj=obj, request=request)
         bundle = self.full_dehydrate(bundle)
@@ -2065,6 +2069,7 @@ class ModelResource(Resource):
         for key, value in kwargs.items():
             setattr(bundle.obj, key, value)
         bundle = self.full_hydrate(bundle)
+
         self.is_valid(bundle,request)
 
         if bundle.errors:
@@ -2139,6 +2144,7 @@ class ModelResource(Resource):
                 raise NotFound("A model instance matching the provided arguments could not be found.")
 
         bundle = self.full_hydrate(bundle)
+        self.is_authorized(request, bundle.obj)
         self.is_valid(bundle,request)
 
         if bundle.errors and not skip_errors:
@@ -2186,6 +2192,7 @@ class ModelResource(Resource):
             except ObjectDoesNotExist:
                 raise NotFound("A model instance matching the provided arguments could not be found.")
 
+        self.is_authorized(request, obj)
         obj.delete()
 
     @transaction.commit_on_success()
