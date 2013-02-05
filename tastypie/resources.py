@@ -653,7 +653,7 @@ class Resource(object):
         the authorization backend can apply additional row-level permissions
         checking.
         """
-        auth_result = self._meta.authorization.is_authorized(request, object, parent_object=self.parent_object)
+        auth_result = self._meta.authorization.is_authorized(request, object, parent_obj=self.parent_obj)
 
         if not auth_result is True:
             raise ImmediateResponse(self._meta.response_router_obj[request].get_unauthorized_request_response())
