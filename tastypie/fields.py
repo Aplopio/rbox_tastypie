@@ -557,7 +557,11 @@ class RelatedField(ApiField):
             return related_resource.get_resource_uri(bundle.request, bundle)
         else:
             # ZOMG extra data and big payloads.
-            bundle = related_resource.build_bundle(obj=related_resource.instance, request=bundle.request)
+            bundle = related_resource.build_bundle(
+                obj=related_resource.instance,
+                request=bundle.request,
+                objects_saved=bundle.objects_saved
+            )
             return related_resource.full_dehydrate(bundle)
 
     def resource_from_uri(self, fk_resource, uri, request=None, related_obj=None, related_name=None):
@@ -567,7 +571,10 @@ class RelatedField(ApiField):
         """
         try:
             obj = fk_resource.get_via_uri(uri, request=request)
-            bundle = fk_resource.build_bundle(obj=obj, request=request)
+            bundle = fk_resource.build_bundle(
+                obj=obj,
+                request=request
+            )
             return fk_resource.full_dehydrate(bundle)
         except ObjectDoesNotExist:
             raise ApiFieldError("Could not find the provided object via resource URI '%s'." % uri)
@@ -579,7 +586,10 @@ class RelatedField(ApiField):
         """
         # Try to hydrate the data provided.
         data = dict_strip_unicode_keys(data)
-        fk_bundle = fk_resource.build_bundle(data=data, request=request)
+        fk_bundle = fk_resource.build_bundle(
+            data=data,
+            request=request
+        )
 
         if related_obj:
             fk_bundle.related_obj = related_obj
@@ -593,17 +603,18 @@ class RelatedField(ApiField):
 
         try:
             return fk_resource.obj_update(fk_bundle, skip_errors=True, **data)
-        except NotFound:
+        except (NotFound, TypeError):
             try:
                 # Attempt lookup by primary key
                 lookup_kwargs = dict((k, v) for k, v in data.iteritems() if getattr(fk_resource, k).unique)
 
                 if not lookup_kwargs:
                     raise NotFound()
+
                 return fk_resource.obj_update(fk_bundle, skip_errors=True, **lookup_kwargs)
             except NotFound:
                 fk_bundle = fk_resource.full_hydrate(fk_bundle)
-                fk_resource.is_valid(fk_bundle, request)
+                fk_resource.is_valid(fk_bundle)
                 return fk_bundle
         except MultipleObjectsReturned:
             return fk_resource.full_hydrate(fk_bundle)
@@ -613,7 +624,10 @@ class RelatedField(ApiField):
         Given an object with a ``pk`` attribute, the related resource
         is attempted to be loaded via that PK.
         """
-        bundle = fk_resource.build_bundle(obj=obj, request=request)
+        bundle = fk_resource.build_bundle(
+            obj=obj,
+            request=request
+        )
         return fk_resource.full_dehydrate(bundle)
 
     def build_related_resource(self, value, request=None, related_obj=None, related_name=None):
@@ -631,12 +645,13 @@ class RelatedField(ApiField):
             'related_name': related_name,
         }
 
-        if isinstance(value, tuple(self.uri_cls_list)):
+        if isinstance(value, Bundle):
+            # Already hydrated, probably nested bundles. Just return.
+            return value
+        elif isinstance(value, basestring):
+            #elif isinstance(value, tuple(self.uri_cls_list)):
             # We got a URI. Load the object and assign it.
             return self.resource_from_uri(self.fk_resource, value, **kwargs)
-        elif isinstance(value, Bundle):
-            # We got a valid bundle object, the RelatedField had full=True
-            return value
         elif hasattr(value, 'items'):
             # We've got a data dictionary.
             # Since this leads to creation, this is the only one of these
@@ -717,8 +732,28 @@ class ToOneField(RelatedField):
 
                 setattr(related_obj, self.related_name, bundle.obj)
 
-            related_obj.save()
-            setattr(bundle.obj, self.attribute, related_obj)
+            related_resource = self.get_related_resource(related_obj)
+
+            # Before we build the bundle & try saving it, let's make sure we
+            # haven't already saved it.
+            obj_id = self.related_resource.create_identifier(related_obj)
+
+            if obj_id in bundle.objects_saved:
+                # It's already been saved. We're done here.
+                continue
+
+            if bundle.data.get(field_name) and hasattr(bundle.data[field_name], 'keys'):
+                # Only build & save if there's data, not just a URI.
+                related_bundle = related_resource.build_bundle(
+                    obj=related_obj,
+                    data=bundle.data.get(field_name),
+                    request=bundle.request,
+                    objects_saved=bundle.objects_saved
+                )
+                related_resource.save(related_bundle)
+
+            setattr(bundle.obj, field_object.attribute, related_obj)
+
         return bundle
 
 class ForeignKey(ToOneField):
@@ -852,8 +887,25 @@ class ToManyField(RelatedField):
         related_objs = []
 
         for related_bundle in bundle.data[self.instance_name]:
-            related_bundle.obj.save()
-            related_objs.append(related_bundle.obj)
+            related_resource = self.get_related_resource(bundle.obj)
+
+            # Before we build the bundle & try saving it, let's make sure we
+            # haven't already saved it.
+            obj_id = related_resource.create_identifier(related_bundle.obj)
+
+            if obj_id in bundle.objects_saved:
+                # It's already been saved. We're done here.
+                continue
+
+            # Only build & save if there's data, not just a URI.
+            updated_related_bundle = related_resource.build_bundle(
+                obj=related_bundle.obj,
+                data=related_bundle.data,
+                request=bundle.request,
+                objects_saved=bundle.objects_saved
+            )
+            related_resource.save(updated_related_bundle)
+            related_objs.append(updated_related_bundle.obj)
         return related_objs 
 
 
