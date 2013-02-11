@@ -15,7 +15,7 @@ from tastypie.authorization import ReadOnlyAuthorization
 from tastypie.bundle import Bundle
 from tastypie.cache import NoCache
 from tastypie.constants import ALL, ALL_WITH_RELATIONS
-from tastypie.exceptions import NotFound, BadRequest, InvalidFilterError, HydrationError, InvalidSortError, ImmediateHttpResponse, Unauthorized
+from tastypie.exceptions import NotFound, BadRequest, InvalidFilterError, HydrationError, InvalidSortError, ImmediateResponse, Unauthorized
 from tastypie import fields
 from tastypie import http
 from tastypie.paginator import Paginator
@@ -692,7 +692,7 @@ class Resource(object):
         self._meta.throttle.accessed(self._meta.authentication.get_identifier(request), url=request.get_full_path(), request_method=request_method)
 
     def unauthorized_result(self, exception):
-        raise ImmediateHttpResponse(response=http.HttpUnauthorized())
+        raise ImmediateResponse(response=http.HttpUnauthorized())
 
     def authorized_read_list(self, object_list, bundle):
         """

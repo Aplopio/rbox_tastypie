@@ -736,13 +736,8 @@ class ToOneField(RelatedField):
 
             # Before we build the bundle & try saving it, let's make sure we
             # haven't already saved it.
-            obj_id = self.related_resource.create_identifier(related_obj)
-
-            if obj_id in bundle.objects_saved:
-                # It's already been saved. We're done here.
-                continue
-
-            if bundle.data.get(field_name) and hasattr(bundle.data[field_name], 'keys'):
+            obj_id = related_resource.create_identifier(related_obj)
+            if not (obj_id in bundle.objects_saved) and (bundle.data.get(field_name) and hasattr(bundle.data[field_name], 'keys')):
                 # Only build & save if there's data, not just a URI.
                 related_bundle = related_resource.build_bundle(
                     obj=related_obj,
