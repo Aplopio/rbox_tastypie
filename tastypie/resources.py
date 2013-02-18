@@ -376,12 +376,10 @@ class Resource(object):
         pk = kwargs.pop('pk')
 
         self.is_authenticated(request)
-        self.is_authorized(request)
         self.throttle_check(request)
-
-
         try:
-            parent_obj = self.obj_get(request=request, **{'pk':pk})
+            parent_bundle = self.build_bundle(request=request)
+            parent_obj = self.obj_get(parent_bundle, **{'pk':pk})
         except Exception:
             return self._meta.response_router_obj[request].get_not_found_response()
         
@@ -668,7 +666,7 @@ class Resource(object):
         method = getattr(self, '%s_%s' %(get_current_func_name(), get_request_class(request)))
         return method(request)
 
-    def throttle_check_wsgirequest(self, request):        
+    def throttle_check_wsgirequest(self, request):
         
         identifier = self._meta.authentication.get_identifier(request)
 
@@ -878,7 +876,7 @@ class Resource(object):
         kwargs.update(self.resource_parent_uri_kwargs(self.parent_resource, self.parent_pk))
         return kwargs
 
-    def get_resource_uri(self, request=None, bundle_or_obj=None, **kwargs):
+    def get_resource_uri(self, bundle_or_obj=None, **kwargs):
         """
         Handles generating a resource URI.
 
@@ -893,19 +891,19 @@ class Resource(object):
         """
 
          #check for format
-        if request:
-            _format = self.determine_format(request)
+        if isinstance(bundle_or_obj,Bundle):
+            _format = self.determine_format(bundle_or_obj.request)
         ##strip the "application" in "application/{format}"
             _format = _format.split('/')[1]
         
         ##WARNING: if a method is not provided for your type will pass to default<
             method = getattr(self, '%s_%s' % (get_current_func_name(), _format), self.get_resource_uri_default)
-            return method(request, bundle_or_obj, **kwargs)
+            return method(bundle_or_obj, **kwargs)
         else:
-            return self.get_resource_uri_default(request, bundle_or_obj, **kwargs)
+            return self.get_resource_uri_default(bundle_or_obj, **kwargs)
             
 
-    def get_resource_uri_default(self, request, bundle_or_obj, url_name='api_dispatch_list', **kwargs):
+    def get_resource_uri_default(self, bundle_or_obj, url_name='api_dispatch_list', **kwargs):
         if bundle_or_obj is not None:
             url_name = 'api_dispatch_detail'
         
@@ -1114,7 +1112,7 @@ class Resource(object):
         Returns empty string if no URI can be generated.
         """
         try:
-            return self.get_resource_uri(bundle.request, bundle)
+            return self.get_resource_uri(bundle)
         except NotImplementedError:
             return ''
         except NoReverseMatch:
@@ -1367,7 +1365,7 @@ class Resource(object):
         objects = self.obj_get_list(bundle=base_bundle, **self.remove_api_resource_names(kwargs))
         sorted_objects = self.apply_sorting(objects, options=request.GET)
 
-        paginator = self._meta.paginator_class(request.GET, sorted_objects, resource_uri=self.get_resource_uri(request), limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
+        paginator = self._meta.paginator_class(request.GET, sorted_objects, resource_uri=self.get_resource_uri(), limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
         to_be_serialized = paginator.page()
 
         # Dehydrate the bundles in preparation for serialization.
@@ -1553,7 +1551,6 @@ class Resource(object):
         # Manually construct the bundle here, since we don't want to try to
         # delete an empty instance.
         bundle = Bundle(request=request)
-
         try:
             self.obj_delete(bundle=bundle, **self.remove_api_resource_names(kwargs))
             return  self._meta.response_router_obj[request].get_no_content_response()
@@ -2144,7 +2141,6 @@ class ModelResource(Resource):
         used to narrow the query.
         """
         filters = {}
-
         if hasattr(bundle.request, 'GET'):
             # Grab a mutable copy.
             filters = bundle.request.GET.copy()
@@ -2233,7 +2229,7 @@ class ModelResource(Resource):
 
         return lookup_kwargs
 
-    def obj_update(self, bundle, skip_errors=False, **kwargs):
+    def obj_update(self,bundle,skip_errors=False,**kwargs):
         """
         A ORM-specific implementation of ``obj_update``.
         """
@@ -2251,8 +2247,8 @@ class ModelResource(Resource):
             except ObjectDoesNotExist:
                 raise NotFound("A model instance matching the provided arguments could not be found.")
 
-        self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
         bundle = self.full_hydrate(bundle)
+        self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
         return self.save(bundle, skip_errors=skip_errors)
 
     def obj_delete_list(self, bundle, **kwargs):
