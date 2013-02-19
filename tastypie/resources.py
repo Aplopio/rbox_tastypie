@@ -805,7 +805,8 @@ class Resource(object):
             data=data,
             request=request,
             objects_saved=objects_saved,
-            parent_obj=self.parent_obj
+            parent_obj=self.parent_obj,
+            parent_resource = self.parent_resource
         )
 
     def build_filters(self, filters=None):
@@ -889,7 +890,6 @@ class Resource(object):
         Return the generated URI. If that URI can not be reversed (not found
         in the URLconf), it will return an empty string.
         """
-
          #check for format
         if isinstance(bundle_or_obj,Bundle):
             _format = self.determine_format(bundle_or_obj.request)

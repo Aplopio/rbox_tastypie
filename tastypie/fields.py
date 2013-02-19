@@ -554,7 +554,7 @@ class RelatedField(ApiField):
         """
         if not self.full:
             # Be a good netizen.
-            return related_resource.get_resource_uri(bundle.request, bundle)
+            return related_resource.get_resource_uri(bundle)
         else:
             # ZOMG extra data and big payloads.
             bundle = related_resource.build_bundle(
@@ -647,6 +647,9 @@ class RelatedField(ApiField):
 
         if isinstance(value, Bundle):
             # Already hydrated, probably nested bundles. Just return.
+            if orig_bundle:
+                #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
+                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(value.obj)) 
             return value
         elif isinstance(value, basestring):
             #elif isinstance(value, tuple(self.uri_cls_list)):
