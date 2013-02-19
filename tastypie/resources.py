@@ -719,7 +719,7 @@ class Resource(object):
 
         return Bundle(obj=obj, data=data, request=request, parent_obj=self.parent_obj)
 
-    def build_filters(self, filters=None):
+    def build_filters(self, filters=None, request=None):
         """
         Allows for the filtering of applicable objects.
 
@@ -1882,7 +1882,7 @@ class ModelResource(Resource):
 
         return value
 
-    def build_filters(self, filters=None):
+    def build_filters(self, filters=None, request=None):
         """
         Given a dictionary of filters, create the necessary ORM-level filters.
 
@@ -2031,7 +2031,7 @@ class ModelResource(Resource):
             filters = request.GET.copy()
         # Update with the provided kwargs.
         filters.update(kwargs)
-        applicable_filters = self.build_filters(filters=filters)
+        applicable_filters = self.build_filters(filters=filters,request=request)
 
         try:
             base_object_list = self.apply_filters(request, applicable_filters)
