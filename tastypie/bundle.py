@@ -10,14 +10,24 @@ class Bundle(object):
     Necessary because the ``dehydrate/hydrate`` cycle needs to access data at
     different points.
     """
-    def __init__(self, obj=None, data=None, request=None, related_obj=None, related_name=None, parent_obj=None):
+    def __init__(self,
+                 obj=None,
+                 data=None,
+                 request=None,
+                 related_obj=None,
+                 related_name=None,
+                 objects_saved=None,
+                 parent_obj=None,
+                 parent_resource=None):
         self.obj = obj
         self.data = data or {}
         self.request = request or HttpRequest()
         self.related_obj = related_obj
         self.related_name = related_name
         self.errors = {}
+        self.objects_saved = objects_saved or set()
         self.parent_obj = parent_obj
+        self.parent_resource = parent_resource
 
     def __repr__(self):
         return "<Bundle for obj: '%s' and with data: '%s'>" % (self.obj, self.data)

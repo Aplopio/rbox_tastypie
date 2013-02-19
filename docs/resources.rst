@@ -158,6 +158,23 @@ Ideology aside, you should use whatever suits you. If you prefer fewer requests
 consequences of each approach.
 
 
+Accessing The Current Request
+=============================
+
+Being able to change behavior based on the current request is a very commmon
+need. Virtually anywhere within ``Resource/ModelResource``, if a ``bundle`` is
+available, you can access it using ``bundle.request``. This is useful for
+altering querysets, ensuring headers are present, etc.
+
+Most methods you may need to override/extend should get a ``bundle`` passed to
+them.
+
+If you're using the ``Resource/ModelResource`` directly, with no ``request``
+available, an empty ``Request`` will be supplied instead. If this is a common
+pattern/usage in your code, you'll want to accommodate for data that potentially
+isn't there.
+
+
 Advanced Data Preparation
 =========================
 
@@ -1214,7 +1231,7 @@ This needs to be implemented at the user level.
 ``obj_get_list``
 ----------------
 
-.. method:: Resource.obj_get_list(self, request=None, **kwargs)
+.. method:: Resource.obj_get_list(self, bundle, **kwargs)
 
 Fetches the list of objects available on the resource.
 
@@ -1226,7 +1243,7 @@ Fetches the list of objects available on the resource.
 ``cached_obj_get_list``
 -----------------------
 
-.. method:: Resource.cached_obj_get_list(self, request=None, **kwargs)
+.. method:: Resource.cached_obj_get_list(self, bundle, **kwargs)
 
 A version of ``obj_get_list`` that uses the cache as a means to get
 commonly-accessed data faster.
@@ -1234,7 +1251,7 @@ commonly-accessed data faster.
 ``obj_get``
 -----------
 
-.. method:: Resource.obj_get(self, request=None, **kwargs)
+.. method:: Resource.obj_get(self, bundle, **kwargs)
 
 Fetches an individual object on the resource.
 
@@ -1247,7 +1264,7 @@ be found, this should raise a ``NotFound`` exception.
 ``cached_obj_get``
 ------------------
 
-.. method:: Resource.cached_obj_get(self, request=None, **kwargs)
+.. method:: Resource.cached_obj_get(self, bundle, **kwargs)
 
 A version of ``obj_get`` that uses the cache as a means to get
 commonly-accessed data faster.
@@ -1255,7 +1272,7 @@ commonly-accessed data faster.
 ``obj_create``
 --------------
 
-.. method:: Resource.obj_create(self, bundle, request=None, **kwargs)
+.. method:: Resource.obj_create(self, bundle, **kwargs)
 
 Creates a new object based on the provided data.
 
@@ -1276,7 +1293,7 @@ lookup parameters that can find them in the DB.
 ``obj_update``
 --------------
 
-.. method:: Resource.obj_update(self, bundle, request=None, **kwargs)
+.. method:: Resource.obj_update(self, bundle, **kwargs)
 
 Updates an existing object (or creates a new object) based on the
 provided data.
@@ -1289,9 +1306,21 @@ provided data.
 ``obj_delete_list``
 -------------------
 
-.. method:: Resource.obj_delete_list(self, request=None, **kwargs)
+.. method:: Resource.obj_delete_list(self, bundle, **kwargs)
 
 Deletes an entire list of objects.
+
+*This needs to be implemented at the user level.*
+
+``ModelResource`` includes a full working version specific to Django's
+``Models``.
+
+``obj_delete_list_for_update``
+------------------------------
+
+.. method:: Resource.obj_delete_list_for_update(self, bundle, **kwargs)
+
+Deletes an entire list of objects, specific to PUT list.
 
 *This needs to be implemented at the user level.*
 
@@ -1301,7 +1330,7 @@ Deletes an entire list of objects.
 ``obj_delete``
 --------------
 
-.. method:: Resource.obj_delete(self, request=None, **kwargs)
+.. method:: Resource.obj_delete(self, bundle, **kwargs)
 
 Deletes a single object.
 
@@ -1322,7 +1351,7 @@ Mostly a useful shortcut/hook.
 ``is_valid``
 ------------
 
-.. method:: Resource.is_valid(self, bundle, request=None)
+.. method:: Resource.is_valid(self, bundle)
 
 Handles checking if the data provided by the user is valid.
 
@@ -1702,6 +1731,15 @@ A ORM-specific implementation of ``obj_update``.
 .. method:: ModelResource.obj_delete_list(self, **kwargs)
 
 A ORM-specific implementation of ``obj_delete_list``.
+
+Takes optional ``kwargs``, which can be used to narrow the query.
+
+``obj_delete_list_for_update``
+------------------------------
+
+.. method:: ModelResource.obj_delete_list_for_update(self, **kwargs)
+
+A ORM-specific implementation of ``obj_delete_list_for_update``.
 
 Takes optional ``kwargs``, which can be used to narrow the query.
 

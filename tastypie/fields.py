@@ -554,10 +554,14 @@ class RelatedField(ApiField):
         """
         if not self.full:
             # Be a good netizen.
-            return related_resource.get_resource_uri(bundle.request, bundle)
+            return related_resource.get_resource_uri(bundle)
         else:
             # ZOMG extra data and big payloads.
-            bundle = related_resource.build_bundle(obj=related_resource.instance, request=bundle.request)
+            bundle = related_resource.build_bundle(
+                obj=related_resource.instance,
+                request=bundle.request,
+                objects_saved=bundle.objects_saved
+            )
             return related_resource.full_dehydrate(bundle)
 
     def resource_from_uri(self, fk_resource, uri, request=None, related_obj=None, related_name=None):
@@ -567,7 +571,10 @@ class RelatedField(ApiField):
         """
         try:
             obj = fk_resource.get_via_uri(uri, request=request)
-            bundle = fk_resource.build_bundle(obj=obj, request=request)
+            bundle = fk_resource.build_bundle(
+                obj=obj,
+                request=request
+            )
             return fk_resource.full_dehydrate(bundle)
         except ObjectDoesNotExist:
             raise ApiFieldError("Could not find the provided object via resource URI '%s'." % uri)
@@ -579,7 +586,10 @@ class RelatedField(ApiField):
         """
         # Try to hydrate the data provided.
         data = dict_strip_unicode_keys(data)
-        fk_bundle = fk_resource.build_bundle(data=data, request=request)
+        fk_bundle = fk_resource.build_bundle(
+            data=data,
+            request=request
+        )
 
         if related_obj:
             fk_bundle.related_obj = related_obj
@@ -593,17 +603,18 @@ class RelatedField(ApiField):
 
         try:
             return fk_resource.obj_update(fk_bundle, skip_errors=True, **data)
-        except NotFound:
+        except (NotFound, TypeError):
             try:
                 # Attempt lookup by primary key
                 lookup_kwargs = dict((k, v) for k, v in data.iteritems() if getattr(fk_resource, k).unique)
 
                 if not lookup_kwargs:
                     raise NotFound()
+
                 return fk_resource.obj_update(fk_bundle, skip_errors=True, **lookup_kwargs)
             except NotFound:
                 fk_bundle = fk_resource.full_hydrate(fk_bundle)
-                fk_resource.is_valid(fk_bundle, request)
+                fk_resource.is_valid(fk_bundle)
                 return fk_bundle
         except MultipleObjectsReturned:
             return fk_resource.full_hydrate(fk_bundle)
@@ -613,10 +624,13 @@ class RelatedField(ApiField):
         Given an object with a ``pk`` attribute, the related resource
         is attempted to be loaded via that PK.
         """
-        bundle = fk_resource.build_bundle(obj=obj, request=request)
+        bundle = fk_resource.build_bundle(
+            obj=obj,
+            request=request
+        )
         return fk_resource.full_dehydrate(bundle)
 
-    def build_related_resource(self, value, request=None, related_obj=None, related_name=None):
+    def build_related_resource(self, value, request=None, related_obj=None, related_name=None, orig_bundle=None):
         """
         Returns a bundle of data built by the related resource, usually via
         ``hydrate`` with the data provided.
@@ -631,12 +645,20 @@ class RelatedField(ApiField):
             'related_name': related_name,
         }
 
-        if isinstance(value, tuple(self.uri_cls_list)):
-            # We got a URI. Load the object and assign it.
-            return self.resource_from_uri(self.fk_resource, value, **kwargs)
-        elif isinstance(value, Bundle):
-            # We got a valid bundle object, the RelatedField had full=True
+        if isinstance(value, Bundle):
+            # Already hydrated, probably nested bundles. Just return.
+            if orig_bundle:
+                #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
+                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(value.obj)) 
             return value
+        elif isinstance(value, basestring):
+            #elif isinstance(value, tuple(self.uri_cls_list)):
+            # We got a URI. Load the object and assign it.
+            bundle = self.resource_from_uri(self.fk_resource, value, **kwargs)
+            if orig_bundle:
+                #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
+                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj)) 
+            return bundle
         elif hasattr(value, 'items'):
             # We've got a data dictionary.
             # Since this leads to creation, this is the only one of these
@@ -644,7 +666,11 @@ class RelatedField(ApiField):
             return self.resource_from_data(self.fk_resource, value, **kwargs)
         elif hasattr(value, 'pk'):
             # We've got an object with a primary key.
-            return self.resource_from_pk(self.fk_resource, value, **kwargs)
+            bundle = self.resource_from_pk(self.fk_resource, value, **kwargs)
+            if orig_bundle:
+                #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
+                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj)) 
+            return bundle
         else:
             raise ApiFieldError("The '%s' field was given data that was not a URI, not a dictionary-alike and does not have a 'pk' attribute: %s." % (self.instance_name, value))
 
@@ -690,7 +716,7 @@ class ToOneField(RelatedField):
             return None
 
         self.fk_resource = self.get_related_resource(foreign_obj, bundle)
-        fk_bundle = Bundle(obj=foreign_obj, request=bundle.request)
+        fk_bundle = self.fk_resource.build_bundle(obj=foreign_obj, request=bundle.request)
         return self.dehydrate_related(fk_bundle, self.fk_resource)
 
     def hydrate(self, bundle):
@@ -699,7 +725,7 @@ class ToOneField(RelatedField):
         if value is None:
             return value
 
-        return self.build_related_resource(value, request=bundle.request)
+        return self.build_related_resource(value, request=bundle.request, orig_bundle=bundle)
 
     
     def save(self, bundle):
@@ -711,14 +737,29 @@ class ToOneField(RelatedField):
 
         # Because sometimes it's ``None`` & that's OK.
         if related_obj:
+            #Save the main object first before saving the fk
             if self.related_name:
                 if not self._resource.get_bundle_detail_data(bundle):
                     bundle.obj.save()
 
                 setattr(related_obj, self.related_name, bundle.obj)
 
-            related_obj.save()
+            related_resource = self.get_related_resource(related_obj)
+            # Before we build the bundle & try saving it, let's make sure we
+            # haven't already saved it.
+            obj_id = related_resource.create_identifier(related_obj)
+            if not (obj_id in bundle.objects_saved) and (bundle.data.get(field_name) and hasattr(bundle.data[field_name], 'keys')):
+                # Only build & save if there's data, not just a URI.
+                related_bundle = related_resource.build_bundle(
+                    obj=related_obj,
+                    data=bundle.data.get(field_name),
+                    request=bundle.request,
+                    objects_saved=bundle.objects_saved
+                )
+                related_resource.save(related_bundle)
+
             setattr(bundle.obj, self.attribute, related_obj)
+
         return bundle
 
 class ForeignKey(ToOneField):
@@ -799,10 +840,9 @@ class ToManyField(RelatedField):
         #       ``Manager`` there.
         for m2m in the_m2ms.all():
             m2m_resource = self.get_related_resource(m2m, bundle)
-            m2m_bundle = Bundle(obj=m2m, request=bundle.request)
+            m2m_bundle = m2m_resource.build_bundle(obj=m2m, request=bundle.request)
             self.m2m_resources.append(m2m_resource)
             m2m_dehydrated.append(self.dehydrate_related(m2m_bundle, m2m_resource))
-
         return m2m_dehydrated
 
     def hydrate(self, bundle):
@@ -828,6 +868,7 @@ class ToManyField(RelatedField):
 
             kwargs = {
                 'request': bundle.request,
+                'orig_bundle' : bundle
             }
 
             if self.related_name:
@@ -835,7 +876,6 @@ class ToManyField(RelatedField):
                 kwargs['related_name'] = self.related_name
 
             m2m_hydrated.append(self.build_related_resource(value, **kwargs))
-
         return m2m_hydrated
 
 
@@ -850,9 +890,25 @@ class ToManyField(RelatedField):
 
     def get_related_objs(self, bundle):
         related_objs = []
-
         for related_bundle in bundle.data[self.instance_name]:
-            related_bundle.obj.save()
+            related_resource = self.get_related_resource(bundle.obj)
+
+            # Before we build the bundle & try saving it, let's make sure we
+            # haven't already saved it.
+            obj_id = related_resource.create_identifier(related_bundle.obj)
+
+            if obj_id in bundle.objects_saved:
+                # It's already been saved. We're done here.
+                related_objs.append(related_bundle.obj)
+                continue
+            # Only build & save if there's data, not just a URI.
+            updated_related_bundle = related_resource.build_bundle(
+                obj=related_bundle.obj,
+                data=related_bundle.data,
+                request=bundle.request,
+                objects_saved=bundle.objects_saved
+            )
+            related_bundle = related_resource.save(updated_related_bundle)
             related_objs.append(related_bundle.obj)
         return related_objs 
 
