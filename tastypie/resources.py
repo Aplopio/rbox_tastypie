@@ -1555,8 +1555,7 @@ class Resource(object):
             self.obj_delete(bundle=bundle, **self.remove_api_resource_names(kwargs))
             return  self._meta.response_router_obj[request].get_no_content_response()
         except NotFound:
-            pass
-
+            return self._meta.response_router_obj[request].get_not_found_response()
 
     def patch_list(self, request, **kwargs):
         """
