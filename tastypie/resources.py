@@ -104,6 +104,9 @@ class ResourceOptions(object):
     collection_name = 'objects'
     detail_uri_name = 'pk'
 
+    prefetch_related_fields = {}
+    select_related_fields = {}
+
     def __new__(cls, meta=None):
         overrides = {}
 
@@ -1783,7 +1786,8 @@ class Resource(object):
         self.throttle_check(request)                 
         self.log_throttled_access(request)
         bundle = self.build_bundle(request=request)
-        self.authorized_read_detail(self.get_object_list(bundle.request), bundle)
+        #Cant imagine why schema has to be validated!
+        #self.authorized_read_detail(self.get_object_list(bundle.request), bundle)
         return self.create_response(request, self.build_schema())
 
     def get_multiple(self, request, **kwargs):
@@ -2180,7 +2184,8 @@ class ModelResource(Resource):
 
         Returns a queryset that may have been limited by other overrides.
         """
-        return self._meta.queryset._clone()
+        qs = self._meta.queryset._clone()
+        return qs
 
     def obj_get_list(self, bundle, **kwargs):
         """

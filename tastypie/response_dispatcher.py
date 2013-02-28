@@ -11,7 +11,7 @@ class HttpResponseDispatcher(object):
         return http.HttpApplicationError
 
     def get_response_notfound_class(self):
-        return http.HttpResponseNotFound
+        return http.HttpNotFound
 
     def get_bad_request_response_class(self):
         return http.HttpBadRequest
