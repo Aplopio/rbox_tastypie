@@ -2369,7 +2369,7 @@ class ModelResource(Resource):
         self.is_valid(bundle)
 
         if bundle.errors and not skip_errors:
-            raise ImmediateHttpResponse(response=self.error_response(bundle.request, bundle.errors))
+            raise ImmediateResponse(response=self.error_response(bundle.request, bundle.errors))
 
         # Check if they're authorized.
         if bundle.obj.pk:
