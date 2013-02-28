@@ -2,6 +2,8 @@ import datetime
 from dateutil.parser import parse
 from decimal import Decimal
 import re
+from django import forms
+
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django import forms as djangoform
 from django.utils import datetime_safe, importlib
@@ -19,6 +21,14 @@ class NOT_PROVIDED:
 DATE_REGEX = re.compile('^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2}).*?$')
 DATETIME_REGEX = re.compile('^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(T|\s+)(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2}).*?$')
 
+
+class AllowEverythingMultipleChoiceField(forms.MultipleChoiceField):
+    def clean(self, value):
+        return value
+
+class AllowEverythingChoiceField(forms.ChoiceField):
+    def clean(self, value):
+        return value
 
 # All the ApiField variants.
 
@@ -389,7 +399,7 @@ class DateTimeField(ApiField):
 
     @property
     def formfield(self):
-        return djangoform.CharField
+        return djangoform.DateTimeField
 
     def convert(self, value):
         if value is None:
@@ -442,10 +452,10 @@ class RelatedField(ApiField):
     
     @property
     def formfield(self):
-        if hasattr(self,'is_m2m') and  self.is_m2m:
-            return djangoform.MultipleChoiceField
+        if getattr(self,'is_m2m',False):
+            return AllowEverythingMultipleChoiceField
         else:
-            return djangoform.ChoiceField
+            return AllowEverythingChoiceField
 
     def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, full=False, unique=False, help_text=None, use_in='all', full_list=True, full_detail=True):
         """
