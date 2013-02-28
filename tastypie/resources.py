@@ -256,11 +256,11 @@ class Resource(object):
 
                 return response
             except (BadRequest, fields.ApiFieldError), e:
-                return self._meta.response_router_obj[request].get_bad_request_response(e.args[0])
-
+                data = {"error": e.args[0] if getattr(e, 'args') else ''}
+                return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
             except ValidationError, e:
-                return  self._meta.response_router_obj[request].get_bad_request_response(', '.join(e.messages))
-
+                data = {"error": e.messages}
+                return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
             except Exception, e:
                 return self._handle_500(request, e)
                 
@@ -308,9 +308,7 @@ class Resource(object):
                 "error_message": unicode(exception),
                 "traceback": the_trace,
             }
-            desired_format = self.determine_format(request)
-            serialized = self.serialize(request, data, desired_format)
-            return response_class(content=serialized, content_type=build_content_type(desired_format))
+            return self.error_response(request, data, response_class=response_class)
 
         # When DEBUG is False, send an error message to the admins (unless it's
         # a 404, in which case we check the setting).
@@ -335,9 +333,7 @@ class Resource(object):
         data = {
             "error_message":getattr(settings, 'TASTYPIE_CANNED_ERROR', "Sorry, this request could not be processed. Please try again later."),
         }
-        desired_format = self.determine_format(request)
-        serialized = self.serialize(request, data, desired_format)
-        return response_class(content=serialized, content_type=build_content_type(desired_format))
+        return self.error_response(request, data, response_class=response_class)
 
     def _build_reverse_url(self, name, args=None, kwargs=None):
         """
@@ -439,9 +435,10 @@ class Resource(object):
         urls += self.sub_resource_urls()
 
 
-        if self.override_urls():
+        overridden_urls = self.override_urls()
+        if overridden_urls:
             warnings.warn("'override_urls' is a deprecated method & will be removed by v1.0.0. Please rename your method to ``prepend_urls``.")
-            urls += self.override_urls()
+            urls += overridden_urls
 
         urls += self.base_urls()
         urlpatterns = patterns('',
@@ -946,13 +943,24 @@ class Resource(object):
 
     # Data preparation.
 
-    def full_dehydrate(self, bundle):
+    def full_dehydrate(self, bundle, for_list=False):
         """
         Given a bundle with an object instance, extract the information from it
         to populate the resource.
         """
+        use_in = ['all', 'list' if for_list else 'detail']
+
         # Dehydrate each field.
         for field_name, field_object in self.fields.items():
+            # If it's not for use in this mode, skip
+            field_use_in = getattr(field_object, 'use_in', 'all')
+            if callable(field_use_in):
+                if not field_use_in(bundle):
+                    continue
+            else:
+                if field_use_in not in use_in:
+                    continue
+
             # A touch leaky but it makes URI resolution work.
             if getattr(field_object, 'dehydrated_type', None) == 'related':
                 field_object.api_name = self._meta.api_name
@@ -1310,15 +1318,42 @@ class Resource(object):
                               content_type=build_content_type(desired_format), **response_kwargs)
 
 
-    def error_response(self, errors, request):
+    def error_response(self, request, errors, response_class=None):
+        """
+        Extracts the common "which-format/serialize/return-error-response"
+        cycle.
+
+        Should be used as much as possible to return errors.
+        """
+        if response_class is None:
+            response_class = self._meta.response_router_obj[request].get_bad_request_response_class()
+
+        desired_format = None
+
         if request:
-            desired_format = self.determine_format(request)
-        else:
+            if request.GET.get('callback', None) is None:
+                try:
+                    desired_format = self.determine_format(request)
+                except BadRequest:
+                    pass  # Fall through to default handler below
+            else:
+                # JSONP can cause extra breakage.
+                desired_format = 'application/json'
+
+        if not desired_format:
             desired_format = self._meta.default_format
 
-        serialized = self.serialize(request, errors, desired_format)
-        response =  self._meta.response_router_obj[request].get_bad_request_response(content=serialized)#, content_type=build_content_type(desired_format))
-        raise ImmediateResponse(response=response)
+        try:
+            serialized = self.serialize(request, errors, desired_format)
+        except BadRequest, e:
+            error = "Additional errors occurred, but serialization of those errors failed."
+
+            if settings.DEBUG:
+                error += " %s" % e
+
+            return response_class(content=error, content_type='text/plain')
+
+        return response_class(content=serialized, content_type=build_content_type(desired_format))
 
     def is_valid(self, bundle):
         """
@@ -1624,6 +1659,8 @@ class Resource(object):
         if len(deserialized[collection_name]) and 'put' not in self._meta.detail_allowed_methods:
             raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response())
 
+        bundles_seen = []
+
         for data in deserialized[collection_name]:
             # If there's a resource_uri then this is either an
             # update-in-place or a create-via-PUT.
@@ -1652,7 +1689,10 @@ class Resource(object):
                 bundle = self.build_bundle(data=dict_strip_unicode_keys(data), request=request)
                 self.obj_create(bundle=bundle)
 
+            bundles_seen.append(bundle)
+
         deleted_collection = deserialized.get(deleted_collection_name, [])
+
         if deleted_collection:
             if 'delete' not in self._meta.detail_allowed_methods:
                 raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response())
@@ -1662,7 +1702,14 @@ class Resource(object):
                 bundle = self.build_bundle(obj=obj, request=request)
                 self.obj_delete(bundle=bundle)
 
-        return  self._meta.response_router_obj[request].get_accepted_response_class()()
+        response_class = self._meta.response_router_obj[request].get_accepted_response_class()
+        if not self._meta.always_return_data:
+            return response_class()
+        else:
+            to_be_serialized = {}
+            to_be_serialized['objects'] = [self.full_dehydrate(bundle) for bundle in bundles_seen]
+            to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
+            return self.create_response(request, to_be_serialized, response_class=response_class)
 
     def patch_detail(self, request, **kwargs):
         """
@@ -2325,7 +2372,7 @@ class ModelResource(Resource):
         self.is_valid(bundle)
 
         if bundle.errors and not skip_errors:
-            self.error_response(bundle.errors, bundle.request)
+            raise ImmediateResponse(response=self.error_response(bundle.request, bundle.errors))
 
         # Check if they're authorized.
         if bundle.obj.pk:

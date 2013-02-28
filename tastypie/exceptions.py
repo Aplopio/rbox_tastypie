@@ -90,7 +90,11 @@ class ImmediateResponse(TastypieError):
         * for throttling
 
     """
-    response = HttpResponse("Nothing provided.")
+    _response = HttpResponse("Nothing provided.")
 
     def __init__(self, response):
-        self.response = response
+        self._response = response
+
+    @property
+    def response(self):
+        return self._response
