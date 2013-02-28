@@ -39,6 +39,39 @@ class TestObject(object):
     date_joined = None
 
 
+class BasicResourceWithDifferentListAndDetailFields(Resource):
+    name = fields.CharField(attribute='name', use_in="all")
+    view_count = fields.IntegerField(attribute='view_count', default=0, use_in="detail")
+    date_joined = fields.DateTimeField(null=True, use_in="list")
+
+    def dehydrate_date_joined(self, bundle):
+        if getattr(bundle.obj, 'date_joined', None) is not None:
+            return bundle.obj.date_joined
+
+        if bundle.data.get('date_joined') is not None:
+            return bundle.data.get('date_joined')
+
+        return aware_datetime(2010, 3, 27, 22, 30, 0)
+
+    def hydrate_date_joined(self, bundle):
+        bundle.obj.date_joined = bundle.data['date_joined']
+        return bundle
+
+    class Meta:
+        object_class = TestObject
+        resource_name = 'basic'
+
+
+class BasicResourceWithDifferentListAndDetailFieldsCallable(Resource):
+    name = fields.CharField(attribute='name', use_in="all")
+    view_count = fields.IntegerField(attribute='view_count', default=0, use_in=lambda x: True)
+    date_joined = fields.DateTimeField(null=True, use_in=lambda x: False)
+
+    class Meta:
+        object_class = TestObject
+        resource_name = 'basic'
+
+
 class BasicResource(Resource):
     name = fields.CharField(attribute='name')
     view_count = fields.IntegerField(attribute='view_count', default=0)
@@ -280,6 +313,64 @@ class ResourceTestCase(TestCase):
         self.assertEqual(len(mrofr.fields), 3)
         self.assertEqual(mrofr.fields['test'].default, 'test_a')
         self.assertEqual(mrofr.fields['name'].default, 'Mr. Field')
+
+    def test_full_dehydrate_with_use_in(self):
+        test_object_1 = TestObject()
+        test_object_1.name = 'Daniel'
+        test_object_1.view_count = 12
+        test_object_1.date_joined = aware_datetime(2010, 3, 30, 9, 0, 0)
+
+        basic = BasicResourceWithDifferentListAndDetailFields()
+        test_bundle_1 = basic.build_bundle(obj=test_object_1)
+
+        # Sanity check.
+        self.assertEqual(basic.name.value, None)
+        self.assertEqual(basic.view_count.value, None)
+        self.assertEqual(basic.date_joined.value, None)
+
+        #check hydration with details
+        bundle_1 = basic.full_dehydrate(test_bundle_1)
+        self.assertEqual(bundle_1.data['name'], 'Daniel')
+        self.assertEqual(bundle_1.data['view_count'], 12)
+        self.assertEqual(bundle_1.data.get('date_joined'), None)
+
+        #now check dehydration with lists
+        test_bundle_2 = basic.build_bundle(obj=test_object_1)
+
+        bundle_2 = basic.full_dehydrate(test_bundle_2, for_list=True)
+        self.assertEqual(bundle_2.data['name'], 'Daniel')
+        self.assertEqual(bundle_2.data.get('view_count'), None)
+        self.assertEqual(bundle_2.data['date_joined'].year, 2010)
+        self.assertEqual(bundle_2.data['date_joined'].day, 30)
+
+    def test_full_dehydrate_with_use_in_callable(self):
+        test_object_1 = TestObject()
+        test_object_1.name = 'Daniel'
+        test_object_1.view_count = 12
+        test_object_1.date_joined = aware_datetime(2010, 3, 30, 9, 0, 0)
+
+        basic = BasicResourceWithDifferentListAndDetailFieldsCallable()
+        test_bundle_1 = basic.build_bundle(obj=test_object_1)
+
+        # Sanity check.
+        self.assertEqual(basic.name.value, None)
+        self.assertEqual(basic.view_count.value, None)
+        self.assertEqual(basic.date_joined.value, None)
+
+        #check hydration with details
+        bundle_1 = basic.full_dehydrate(test_bundle_1)
+        self.assertEqual(bundle_1.data['name'], 'Daniel')
+        self.assertEqual(bundle_1.data['view_count'], 12)
+        self.assertEqual(bundle_1.data.get('date_joined'), None)
+
+        #now check dehydration with lists. Should be the same as details since
+        #we are using callables for the use_in
+        test_bundle_2 = basic.build_bundle(obj=test_object_1)
+
+        bundle_2 = basic.full_dehydrate(test_bundle_2, for_list=True)
+        self.assertEqual(bundle_2.data['name'], 'Daniel')
+        self.assertEqual(bundle_2.data['view_count'], 12)
+        self.assertEqual(bundle_2.data.get('date_joined'), None)
 
     def test_full_dehydrate(self):
         test_object_1 = TestObject()
@@ -704,6 +795,7 @@ class NoteResource(ModelResource):
         }
         ordering = ['title', 'slug', 'resource_uri']
         queryset = Note.objects.filter(is_active=True)
+        serializer = Serializer(formats=['json', 'jsonp', 'xml', 'yaml', 'html', 'plist'])
 
     def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
         if bundle_or_obj is None:
@@ -1578,6 +1670,52 @@ class ModelResourceTestCase(TestCase):
         resource = NoQuerysetNoteResource()
         self.assertEqual(resource.build_filters(), {})
 
+    def test_xss_regressions(self):
+        # Make sure the body is JSON & the content-type is right.
+        resource = RelatedNoteResource()
+        request = HttpRequest()
+        request.method = 'GET'
+
+        request.GET = {
+            'format': 'xml',
+            'author__username__startswith': 'j',
+        }
+        resp = resource.wrap_view('dispatch_list')(request)
+        self.assertEqual(resp['content-type'], 'application/xml; charset=utf-8')
+        self.assertEqual(resp.content, "<?xml version='1.0' encoding='utf-8'?>\n<response><error>Lookups are not allowed more than one level deep on the 'author' field.</error></response>")
+
+        request.GET = {
+            'format': 'json',
+            'author__<script>alert("XSS")</script>': 'j',
+        }
+        resp = resource.wrap_view('dispatch_list')(request)
+        self.assertEqual(resp['content-type'], 'application/json')
+        self.assertEqual(resp.content, '{"error": "Lookups are not allowed more than one level deep on the \'author\' field."}')
+
+        request.GET = {
+            'format': 'json',
+            'limit': '<img%20src="http://ycombinator.com/images/y18.gif">',
+        }
+        resp = resource.wrap_view('dispatch_list')(request)
+        self.assertEqual(resp['content-type'], 'application/json')
+        self.assertEqual(resp.content, '{"error": "Invalid limit \'<img%20src=\\"http://ycombinator.com/images/y18.gif\\">\' provided. Please provide a positive integer."}')
+
+        request.GET = {
+            'format': 'json',
+            'limit': '<img%20src="http://ycombinator.com/images/y18.gif">',
+        }
+        resp = resource.wrap_view('dispatch_list')(request)
+        self.assertEqual(resp['content-type'], 'application/json')
+        self.assertEqual(resp.content, '{"error": "Invalid limit \'<img%20src=\\"http://ycombinator.com/images/y18.gif\\">\' provided. Please provide a positive integer."}')
+
+        request.GET = {
+            'format': 'json',
+            'offset': '<script>alert("XSS")</script>',
+        }
+        resp = resource.wrap_view('dispatch_list')(request)
+        self.assertEqual(resp['content-type'], 'application/json')
+        self.assertEqual(resp.content, '{"error": "Invalid offset \'<script>alert(\\"XSS\\")</script>\' provided. Please provide an integer."}')
+
     def test_apply_sorting(self):
         resource = NoteResource()
         base_bundle = Bundle()
@@ -1973,6 +2111,20 @@ class ModelResourceTestCase(TestCase):
         updated_note = Note.objects.get(pk=2)
         self.assertEqual(updated_note.content, "This is note 2.")
 
+    def test_patch_list_return_data(self):
+        always_resource = AlwaysDataNoteResource()
+        request = HttpRequest()
+        request.GET = {'format': 'json'}
+        request.method = 'PATCH'
+        request._read_started = False
+        
+        self.assertEqual(Note.objects.count(), 6)
+        request._raw_post_data = request._body = '{"objects": [{"content": "The cat is back. The dog coughed him up out back.", "created": "2010-04-03 20:05:00", "is_active": true, "slug": "cat-is-back-again", "title": "The Cat Is Back", "updated": "2010-04-03 20:05:00"}, {"resource_uri": "/api/v1/notes/2/", "content": "This is note 2."}], "deleted_objects": ["/api/v1/notes/1/"]}'
+
+        resp = always_resource.patch_list(request)
+        self.assertEqual(resp.status_code, 202)
+        self.assertTrue(resp.content.startswith('{"objects": ['))
+
     def test_patch_list_bad_resource_uri(self):
         resource = NoteResource()
         request = HttpRequest()
@@ -2255,7 +2407,8 @@ class ModelResourceTestCase(TestCase):
         # Try again with ``wrap_view`` for sanity.
         resp = resource.wrap_view('dispatch_detail')(request, pk=1)
         self.assertEqual(resp.status_code, 400)
-        self.assertEqual(resp.content, 'JSONP callback name is invalid.')
+        self.assertEqual(resp.content, '{"error": "JSONP callback name is invalid."}')
+        self.assertEqual(resp['content-type'], 'application/json')
 
         # valid JSONP callback should work
         request = HttpRequest()
@@ -2504,6 +2657,17 @@ class ModelResourceTestCase(TestCase):
         notes = NonQuerysetNoteResource().delete_list(request=request)
         self.assertEqual(len(Note.objects.all()), 4)
 
+    def test_obj_delete_list_filtered(self):
+        self.assertEqual(Note.objects.all().count(), 6)
+        
+        note_to_delete = Note.objects.filter(is_active=True)[0]
+        
+        request = HttpRequest()
+        request.method = 'DELETE'
+        request.GET = {'slug':str(note_to_delete.slug)}
+        NoteResource().delete_list(request=request)
+        self.assertEqual(len(Note.objects.all()), 5)
+        
     def test_obj_create(self):
         self.assertEqual(Note.objects.all().count(), 6)
         note = NoteResource()

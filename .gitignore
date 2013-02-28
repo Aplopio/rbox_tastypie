@@ -11,6 +11,7 @@ MANIFEST
 tests/tastypie.db
 .buildinfo
 .tox
+<<<<<<< HEAD
 local_settings.py
 .emacs*
-
+env

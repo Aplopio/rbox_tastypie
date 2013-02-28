@@ -13,6 +13,9 @@ class HttpResponseDispatcher(object):
     def get_response_notfound_class(self):
         return http.HttpResponseNotFound
 
+    def get_bad_request_response_class(self):
+        return http.HttpBadRequest
+
     def get_unauthorized_response_class(self):
         return http.HttpUnauthorized
 
@@ -48,8 +51,11 @@ class HttpResponseDispatcher(object):
     def get_accepted_response_class(self):
         return http.HttpAccepted
 
-    def get_bad_request_response(self, content):
-        return http.HttpBadRequest(content=content)
+    def get_bad_request_response(self, content, content_type=None):
+        if content_type:
+            return http.HttpBadRequest(content=content, content_type=content_type)
+        else:
+            return http.HttpBadRequest(content=content)
 
     def get_method_notallowed_response(self, content):
         return http.HttpMethodNotAllowed(content)
