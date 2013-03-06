@@ -789,13 +789,16 @@ class ToOneField(RelatedField):
 
     def hydrate(self, bundle):
         value = super(ToOneField, self).hydrate(bundle)
-
+        kwargs = {}
         if value is None:
             return value
+        if self.related_name:
+            kwargs['related_obj'] = bundle.obj
+            kwargs['related_name'] = self.related_name
 
-        return self.build_related_resource(value, request=bundle.request, orig_bundle=bundle)
+        return self.build_related_resource(value, request=bundle.request, orig_bundle=bundle,
+                                           **kwargs)
 
-    
     def save(self, bundle):
         # Get the object.
         try:
@@ -807,7 +810,7 @@ class ToOneField(RelatedField):
         if related_obj:
             #Save the main object first before saving the fk
             if self.related_name:
-                if not self._resource.get_bundle_detail_data(bundle):
+                if not self._resource().get_bundle_detail_data(bundle):
                     bundle.obj.save()
 
                 setattr(related_obj, self.related_name, bundle.obj)
@@ -816,11 +819,11 @@ class ToOneField(RelatedField):
             # Before we build the bundle & try saving it, let's make sure we
             # haven't already saved it.
             obj_id = related_resource.create_identifier(related_obj)
-            if not (obj_id in bundle.objects_saved) and (bundle.data.get(field_name) and hasattr(bundle.data[field_name], 'keys')):
+            if not (obj_id in bundle.objects_saved) and (bundle.data.get(self.instance_name) and hasattr(bundle.data[self.instance_name], 'keys')):
                 # Only build & save if there's data, not just a URI.
                 related_bundle = related_resource.build_bundle(
                     obj=related_obj,
-                    data=bundle.data.get(field_name),
+                    data=bundle.data.get(self.instance_name),
                     request=bundle.request,
                     objects_saved=bundle.objects_saved
                 )

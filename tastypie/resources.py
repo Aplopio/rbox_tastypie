@@ -1030,10 +1030,10 @@ class Resource(object):
                         '''
                         if value is not None:
                             setattr(bundle.obj, field_object.attribute, value.obj)
-                        elif field_object.null:
-                            setattr(bundle.obj, field_object.attribute, value)
                         elif field_object.blank:
                             continue
+                        elif field_object.null:
+                            setattr(bundle.obj, field_object.attribute, value)
 
         return bundle
 
