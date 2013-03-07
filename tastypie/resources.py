@@ -104,8 +104,8 @@ class ResourceOptions(object):
     collection_name = 'objects'
     detail_uri_name = 'pk'
 
-    prefetch_related_fields = {}
-    select_related_fields = {}
+    prefetch_related = [] 
+    select_related = []
 
     def __new__(cls, meta=None):
         overrides = {}
@@ -1240,11 +1240,13 @@ class Resource(object):
         A version of ``obj_get`` that uses the cache as a means to get
         commonly-accessed data faster.
         """
+        optimize_query = kwargs.pop('_optimize_query',False)
+
         cache_key = self.generate_cache_key('detail', **kwargs)
         cached_bundle = self._meta.cache.get(cache_key)
 
         if cached_bundle is None:
-            cached_bundle = self.obj_get(bundle=bundle, **kwargs)
+            cached_bundle = self.obj_get(bundle=bundle, _optimize_query=optimize_query, **kwargs)
             self._meta.cache.set(cache_key, cached_bundle)
 
         return cached_bundle
@@ -1411,7 +1413,7 @@ class Resource(object):
 
         for obj in to_be_serialized[self._meta.collection_name]:
             bundle = self.build_bundle(obj=obj, request=request)
-            bundles.append(self.full_dehydrate(bundle))
+            bundles.append(self.full_dehydrate(bundle, for_list=True))
 
         to_be_serialized[self._meta.collection_name] = bundles
         to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
@@ -1429,7 +1431,7 @@ class Resource(object):
         basic_bundle = self.build_bundle(request=request)
 
         try:
-            obj = self.cached_obj_get(bundle=basic_bundle, **self.remove_api_resource_names(kwargs))
+            obj = self.cached_obj_get(bundle=basic_bundle, _optimize_query=True, **self.remove_api_resource_names(kwargs))
         except ObjectDoesNotExist:
             return self._meta.response_router_obj[request].get_not_found_response()
         except MultipleObjectsReturned:
@@ -1730,7 +1732,7 @@ class Resource(object):
         # So first pull out the original object. This is essentially
         # ``get_detail``.
         try:
-            obj = self.cached_obj_get(bundle=basic_bundle, **self.remove_api_resource_names(kwargs))
+            obj = self.cached_obj_get(bundle=basic_bundle, _optimize_query=True, **self.remove_api_resource_names(kwargs))
         except ObjectDoesNotExist:
             return  self._meta.response_router_obj[request].get_not_found_response()
         except MultipleObjectsReturned:
@@ -1757,6 +1759,15 @@ class Resource(object):
         """
         Update the object in original_bundle in-place using new_data.
         """
+        if hasattr(original_bundle.obj,'_prefetched_objects_cache'):
+            for key in new_data.keys():
+                field = self.fields.get(key)
+                try:
+                    cache_key = getattr(original_bundle.obj,field.attribute).prefetch_cache_name
+                    original_bundle.obj._prefetched_objects_cache.pop(cache_key,None)
+                except AttributeError:
+                    pass
+
         original_bundle.data.update(**dict_strip_unicode_keys(new_data))
 
         # Now we've got a bundle with the new data sitting in it and we're
@@ -1810,7 +1821,7 @@ class Resource(object):
 
         for identifier in obj_identifiers:
             try:
-                obj = self.obj_get(bundle=base_bundle, **{self._meta.detail_uri_name: identifier})
+                obj = self.obj_get(bundle=base_bundle, _optimize_query=True, **{self._meta.detail_uri_name: identifier})
                 bundle = self.build_bundle(obj=obj, request=request)
                 bundle = self.full_dehydrate(bundle)
                 objects.append(bundle)
@@ -2175,14 +2186,66 @@ class ModelResource(Resource):
         """
         return self.get_object_list(request).filter(**applicable_filters)
 
+    def get_query_optimizer_params(self, bundle, for_list=False): #passing request to maintain consistency with get_object_list
+        prefetch_related_set = set([])
+        select_related_set = set([])
+        use_in = ['all', 'list' if for_list else 'detail']
+
+        def field_attr_to_related_attr_converter(attr):
+            curr = ''
+            for fragment in attr.split('__'):
+                if curr:
+                    curr = curr + "__" + fragment
+                else:
+                    curr = fragment
+                yield curr
+
+
+        for field_name, field_object in self.fields.items():
+            # If it's not for use in this mode, skip
+            field_use_in = getattr(field_object, 'use_in', 'all')
+            if callable(field_use_in):
+                if not field_use_in(bundle):
+                    continue
+            else:
+                if field_use_in not in use_in:
+                    continue
+            
+            if field_object.instance_name in self._meta.prefetch_related + self._meta.select_related:
+                if field_object.instance_name in self._meta.prefetch_related:
+                    for attr in field_attr_to_related_attr_converter(field_object.attribute):
+                        prefetch_related_set.add(attr)
+                else:
+                    for attr in field_attr_to_related_attr_converter(field_object.attribute):
+                        select_related_set.add(attr)
+
+                if getattr(field_object, 'is_related', False):
+                    sub_resource_cls = field_object.to_class
+                    sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name)
+                    sr_prefetch_related_set, sr_select_related_set = sub_resource_obj.get_query_optimizer_params(bundle, for_list=for_list)
+                    sr_prefetch_related_set = ['%s__%s' %(field_object.attribute,prefetch) for prefetch in sr_prefetch_related_set]
+                    sr_select_related_set = ['%s__%s' %(field_object.attribute,select_related) for select_related in sr_select_related_set]
+                    prefetch_related_set.update(sr_prefetch_related_set)
+                    prefetch_related_set.update(sr_select_related_set)
+
+
+        return prefetch_related_set, select_related_set
+
+    def optimize_query(self, qs, bundle, for_list=False):
+        prefetch_related_set, select_related_set = self.get_query_optimizer_params(bundle, for_list=for_list)
+        if len(prefetch_related_set) > 0:
+            qs = qs.prefetch_related(*prefetch_related_set)
+        if len(select_related_set) > 0:
+            qs = qs.select_related(*select_related_set)
+        return qs
+
     def get_object_list(self, request):
         """
         An ORM-specific implementation of ``get_object_list``.
 
         Returns a queryset that may have been limited by other overrides.
         """
-        qs = self._meta.queryset._clone()
-        return qs
+        return self._meta.queryset._clone()
 
     def obj_get_list(self, bundle, **kwargs):
         """
@@ -2199,9 +2262,9 @@ class ModelResource(Resource):
         # Update with the provided kwargs.
         filters.update(kwargs)
         applicable_filters = self.build_filters(filters=filters,bundle=bundle)
-
         try:
             objects = self.apply_filters(bundle.request, applicable_filters)
+            objects = self.optimize_query(objects, bundle, for_list=True)
             return self.authorized_read_list(objects, bundle)
         except ValueError:
             raise BadRequest("Invalid resource lookup data provided (mismatched type).")
@@ -2213,8 +2276,11 @@ class ModelResource(Resource):
         Takes optional ``kwargs``, which are used to narrow the query to find
         the instance.
         """
+        optimize_query = kwargs.pop('_optimize_query',False)
         try:
             object_list = self.get_object_list(bundle.request).filter(**kwargs)
+            if optimize_query:
+                object_list = self.optimize_query(object_list, bundle)
             stringified_kwargs = ', '.join(["%s=%s" % (k, v) for k, v in kwargs.items()])
 
             if len(object_list) <= 0:
@@ -2294,7 +2360,7 @@ class ModelResource(Resource):
                 lookup_kwargs = kwargs
 
             try:
-                bundle.obj = self.obj_get(bundle=bundle, **lookup_kwargs)
+                bundle.obj = self.obj_get(bundle=bundle, _optimize_query=True, **lookup_kwargs)
             except ObjectDoesNotExist:
                 raise NotFound("A model instance matching the provided arguments could not be found.")
 
