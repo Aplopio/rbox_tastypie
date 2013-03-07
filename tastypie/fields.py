@@ -2,6 +2,8 @@ import datetime
 from dateutil.parser import parse
 from decimal import Decimal
 import re
+from django import forms
+
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django import forms as djangoform
 from django.utils import datetime_safe, importlib
@@ -19,6 +21,14 @@ class NOT_PROVIDED:
 DATE_REGEX = re.compile('^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2}).*?$')
 DATETIME_REGEX = re.compile('^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(T|\s+)(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2}).*?$')
 
+
+class AllowEverythingMultipleChoiceField(forms.MultipleChoiceField):
+    def clean(self, value):
+        return value
+
+class AllowEverythingChoiceField(forms.ChoiceField):
+    def clean(self, value):
+        return value
 
 # All the ApiField variants.
 
@@ -389,7 +399,7 @@ class DateTimeField(ApiField):
 
     @property
     def formfield(self):
-        return djangoform.CharField
+        return djangoform.DateTimeField
 
     def convert(self, value):
         if value is None:
@@ -442,10 +452,10 @@ class RelatedField(ApiField):
     
     @property
     def formfield(self):
-        if hasattr(self,'is_m2m') and  self.is_m2m:
-            return djangoform.MultipleChoiceField
+        if getattr(self,'is_m2m',False):
+            return AllowEverythingMultipleChoiceField
         else:
-            return djangoform.ChoiceField
+            return AllowEverythingChoiceField
 
     def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, full=False, unique=False, help_text=None, use_in='all', full_list=True, full_detail=True):
         """
@@ -779,13 +789,16 @@ class ToOneField(RelatedField):
 
     def hydrate(self, bundle):
         value = super(ToOneField, self).hydrate(bundle)
-
+        kwargs = {}
         if value is None:
             return value
+        if self.related_name:
+            kwargs['related_obj'] = bundle.obj
+            kwargs['related_name'] = self.related_name
 
-        return self.build_related_resource(value, request=bundle.request, orig_bundle=bundle)
+        return self.build_related_resource(value, request=bundle.request, orig_bundle=bundle,
+                                           **kwargs)
 
-    
     def save(self, bundle):
         # Get the object.
         try:
@@ -797,7 +810,7 @@ class ToOneField(RelatedField):
         if related_obj:
             #Save the main object first before saving the fk
             if self.related_name:
-                if not self._resource.get_bundle_detail_data(bundle):
+                if not self._resource().get_bundle_detail_data(bundle):
                     bundle.obj.save()
 
                 setattr(related_obj, self.related_name, bundle.obj)
@@ -806,11 +819,11 @@ class ToOneField(RelatedField):
             # Before we build the bundle & try saving it, let's make sure we
             # haven't already saved it.
             obj_id = related_resource.create_identifier(related_obj)
-            if not (obj_id in bundle.objects_saved) and (bundle.data.get(field_name) and hasattr(bundle.data[field_name], 'keys')):
+            if not (obj_id in bundle.objects_saved) and (bundle.data.get(self.instance_name) and hasattr(bundle.data[self.instance_name], 'keys')):
                 # Only build & save if there's data, not just a URI.
                 related_bundle = related_resource.build_bundle(
                     obj=related_obj,
-                    data=bundle.data.get(field_name),
+                    data=bundle.data.get(self.instance_name),
                     request=bundle.request,
                     objects_saved=bundle.objects_saved
                 )
