@@ -1660,7 +1660,7 @@ class Resource(object):
             raise BadRequest("Invalid data sent: missing '%s'" % collection_name)
 
         if len(deserialized[collection_name]) and 'put' not in self._meta.detail_allowed_methods:
-            raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response())
+            raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response('put'))
 
         bundles_seen = []
 
@@ -1698,7 +1698,7 @@ class Resource(object):
 
         if deleted_collection:
             if 'delete' not in self._meta.detail_allowed_methods:
-                raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response())
+                raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response('delete'))
 
             for uri in deleted_collection:
                 obj = self.get_via_uri(uri, request=request)
