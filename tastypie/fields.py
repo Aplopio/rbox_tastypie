@@ -1021,19 +1021,11 @@ class BaseSubResourceField(object):
         """
         Instaniates the related resource.
         """
-        resource_obj = getattr(self, 'resource_obj')
-        assert bundle is not None
-        resource_pk = bundle.obj.pk
-        related_resource = self.to_class(api_name=self.api_name, parent_resource=resource_obj, parent_pk=resource_pk)
+        related_resource = super(BaseSubResourceField, self).get_related_resource(related_instance, bundle)
+        if bundle:
+            related_resource.parent_resource = getattr(self, 'resource_obj')
+            related_resource.parent_pk = bundle.obj.pk
         
-
-        # Fix the ``api_name`` if it's not present.
-        if related_resource._meta.api_name is None:
-            if self._resource and not self._resource._meta.api_name is None:
-                related_resource._meta.api_name = self._resource._meta.api_name
-
-        if related_instance:
-            related_resource.instance = related_instance
         return related_resource
 
 class ToOneSubResourceField(BaseSubResourceField, ToOneField):
