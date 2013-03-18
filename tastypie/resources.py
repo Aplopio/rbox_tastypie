@@ -1764,12 +1764,13 @@ class Resource(object):
         """
         if hasattr(original_bundle.obj,'_prefetched_objects_cache'):
             for key in new_data.keys():
-                field = self.fields.get(key)
-                try:
-                    cache_key = getattr(original_bundle.obj,field.attribute).prefetch_cache_name
-                    original_bundle.obj._prefetched_objects_cache.pop(cache_key,None)
-                except AttributeError:
-                    pass
+                if key in self._meta.prefetch_related:
+                    field = self.fields.get(key)
+                    try:
+                        cache_key = getattr(original_bundle.obj,field.attribute).prefetch_cache_name
+                        original_bundle.obj._prefetched_objects_cache.pop(cache_key,None)
+                    except AttributeError:
+                        pass
 
         original_bundle.data.update(**dict_strip_unicode_keys(new_data))
 
