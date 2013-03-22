@@ -601,18 +601,18 @@ class RelatedField(ApiField):
         from ``full_dehydrate`` for the related resource.
         """
         should_dehydrate_full_resource = self.should_full_dehydrate(bundle)
-
-        if not should_dehydrate_full_resource:
-            # Be a good netizen.
-            return related_resource.get_resource_uri(bundle)
-        else:
-            # ZOMG extra data and big payloads.
-            bundle = related_resource.build_bundle(
+        related_bundle = related_resource.build_bundle(
                 obj=related_resource.instance,
                 request=bundle.request,
                 objects_saved=bundle.objects_saved
             )
-            return related_resource.full_dehydrate(bundle)
+
+        if not should_dehydrate_full_resource:
+            # Be a good netizen.
+            return related_resource.get_resource_uri(related_bundle)
+        else:
+            # ZOMG extra data and big payloads.
+            return related_resource.full_dehydrate(related_bundle)
 
     def resource_from_uri(self, fk_resource, uri, request=None, related_obj=None, related_name=None):
         """
@@ -784,8 +784,8 @@ class ToOneField(RelatedField):
             return None
 
         self.fk_resource = self.get_related_resource(foreign_obj, bundle)
-        fk_bundle = self.fk_resource.build_bundle(obj=foreign_obj, request=bundle.request)
-        return self.dehydrate_related(fk_bundle, self.fk_resource)
+        #fk_bundle = self.fk_resource.build_bundle(obj=foreign_obj, request=bundle.request)
+        return self.dehydrate_related(bundle, self.fk_resource)
 
     def hydrate(self, bundle):
         value = super(ToOneField, self).hydrate(bundle)
@@ -909,12 +909,12 @@ class ToManyField(RelatedField):
         m2m_dehydrated = []
 
         # TODO: Also model-specific and leaky. Relies on there being a
-        #       ``Manager`` there.
+        #       ``Manager`` there
         for m2m in the_m2ms.all():
             m2m_resource = self.get_related_resource(m2m, bundle)
-            m2m_bundle = m2m_resource.build_bundle(obj=m2m, request=bundle.request)
+            #m2m_bundle = m2m_resource.build_bundle(obj=m2m, request=bundle.request)
             self.m2m_resources.append(m2m_resource)
-            m2m_dehydrated.append(self.dehydrate_related(m2m_bundle, m2m_resource))
+            m2m_dehydrated.append(self.dehydrate_related(bundle, m2m_resource))
         return m2m_dehydrated
 
     def hydrate(self, bundle):
