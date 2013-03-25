@@ -958,7 +958,7 @@ class Resource(object):
             # If it's not for use in this mode, skip
             field_use_in = getattr(field_object, 'use_in', 'all')
             if callable(field_use_in):
-                if not field_use_in(bundle):
+                if not field_use_in(bundle,for_list):
                     continue
             else:
                 if field_use_in not in use_in:
@@ -2209,7 +2209,7 @@ class ModelResource(Resource):
             # If it's not for use in this mode, skip
             field_use_in = getattr(field_object, 'use_in', 'all')
             if callable(field_use_in):
-                if not field_use_in(bundle):
+                if not field_use_in(bundle, for_list):
                     continue
             else:
                 if field_use_in not in use_in:
@@ -2346,7 +2346,7 @@ class ModelResource(Resource):
             if field_object.attribute:
                 value = field_object.hydrate(bundle)
 
-            lookup_kwargs[identifier] = value
+            lookup_kwargs[field_object.attribute] = value
 
         return lookup_kwargs
 
@@ -2367,7 +2367,6 @@ class ModelResource(Resource):
                 bundle.obj = self.obj_get(bundle=bundle, _optimize_query=True, **lookup_kwargs)
             except ObjectDoesNotExist:
                 raise NotFound("A model instance matching the provided arguments could not be found.")
-
         bundle = self.full_hydrate(bundle)
         self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
         return self.save(bundle, skip_errors=skip_errors)
