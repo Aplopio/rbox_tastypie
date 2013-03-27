@@ -629,6 +629,24 @@ class RelatedField(ApiField):
         except ObjectDoesNotExist:
             raise ApiFieldError("Could not find the provided object via resource URI '%s'." % uri)
 
+
+    def get_obj_from_data(self, resource, bundle, **kwargs):
+        if not bundle.obj or not resource.get_bundle_detail_data(bundle):
+            try:
+                lookup_kwargs = resource.lookup_kwargs_with_identifiers(bundle, kwargs)
+            except:
+                # if there is trouble hydrating the data, fall back to just
+                # using kwargs by itself (usually it only contains a "pk" key
+                # and this will work fine.
+                lookup_kwargs = kwargs
+
+            try:
+                obj = resource.obj_get(bundle=bundle, _optimize_query=False, **lookup_kwargs)
+            except ObjectDoesNotExist:
+                raise NotFound("A model instance matching the provided arguments could not be found.")
+            return obj
+
+
     def resource_from_data(self, fk_resource, data, request=None, related_obj=None, related_name=None):
         """
         Given a dictionary-like structure is provided, a fresh related
@@ -652,22 +670,23 @@ class RelatedField(ApiField):
             return fk_resource.full_hydrate(fk_bundle)
 
         try:
-            return fk_resource.obj_update(fk_bundle, skip_errors=True, **data)
+            fk_bundle.obj =  self.get_obj_from_data(fk_resource, fk_bundle, **data)
         except (NotFound, TypeError):
             try:
                 # Attempt lookup by primary key
                 lookup_kwargs = dict((k, v) for k, v in data.iteritems() if getattr(fk_resource, k).unique)
-
                 if not lookup_kwargs:
                     raise NotFound()
-
-                return fk_resource.obj_update(fk_bundle, skip_errors=True, **lookup_kwargs)
+                fk_bundle.obj = self.get_obj_from_data(fk_resource, fk_bundle, **lookup_kwargs)
             except NotFound:
-                fk_bundle = fk_resource.full_hydrate(fk_bundle)
-                fk_resource.is_valid(fk_bundle)
-                return fk_bundle
+                pass
         except MultipleObjectsReturned:
-            return fk_resource.full_hydrate(fk_bundle)
+            pass
+            #return fk_resource.full_hydrate(fk_bundle)
+
+        fk_bundle = fk_resource.full_hydrate(fk_bundle)
+        fk_resource.is_valid(fk_bundle)
+        return fk_bundle
 
     def resource_from_pk(self, fk_resource, obj, request=None, related_obj=None, related_name=None):
         """
