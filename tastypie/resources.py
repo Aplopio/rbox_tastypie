@@ -2331,6 +2331,7 @@ class ModelResource(Resource):
                 lookup_kwargs[identifier] = kwargs[identifier]
                 continue
 
+            if identifier not in self.fields: continue
             field_object = self.fields[identifier]
 
             # Skip readonly or related fields.
