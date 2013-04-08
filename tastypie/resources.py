@@ -103,6 +103,7 @@ class ResourceOptions(object):
     always_return_data = False
     collection_name = 'objects'
     detail_uri_name = 'pk'
+    create_on_related_fields = True
 
     prefetch_related = [] 
     select_related = []
@@ -1661,17 +1662,15 @@ class Resource(object):
         if collection_name not in deserialized:
             raise BadRequest("Invalid data sent: missing '%s'" % collection_name)
 
-        if len(deserialized[collection_name]) and 'put' not in self._meta.detail_allowed_methods:
-            raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response('put'))
+        if len(deserialized[collection_name]) and 'patch' not in self._meta.detail_allowed_methods:
+            raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response('patch'))
 
-        bundles_seen = []
-
+        to_be_updated, to_be_created, bundles_seen = [], [], []
         for data in deserialized[collection_name]:
             # If there's a resource_uri then this is either an
             # update-in-place or a create-via-PUT.
             if "resource_uri" in data:
                 uri = data.pop('resource_uri')
-
                 try:
                     obj = self.get_via_uri(uri, request=request)
 
@@ -1679,40 +1678,50 @@ class Resource(object):
                     bundle = self.build_bundle(obj=obj, request=request)
                     bundle = self.full_dehydrate(bundle)
                     bundle = self.alter_detail_data_to_serialize(request, bundle)
-                    self.update_in_place(request, bundle, data)
-                except (ObjectDoesNotExist, MultipleObjectsReturned):
-                    # The object referenced by resource_uri doesn't exist,
-                    # so this is a create-by-PUT equivalent.
-                    data = self.alter_deserialized_detail_data(request, data)
-                    bundle = self.build_bundle(data=dict_strip_unicode_keys(data), request=request)
-                    self.obj_create(bundle=bundle)
-            else:
-                # There's no resource URI, so this is a create call just
-                # like a POST to the list resource.
+                    self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
+                    self.is_valid(bundle)
+                    to_be_updated.append((request, bundle, data))
+                except ObjectDoesNotExist:
+                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_response_notfound_class()("Couldn't find instace for uri: %s" % uri))
+                except MultipleObjectsReturned:
+                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_bad_request_response_class()("Couldn't find instace for uri: %s" % uri))
 
+                bundles_seen.append(bundle)
+            else:
                 data = self.alter_deserialized_detail_data(request, data)
                 bundle = self.build_bundle(data=dict_strip_unicode_keys(data), request=request)
-                self.obj_create(bundle=bundle)
+                to_be_created.append(bundle)
 
-            bundles_seen.append(bundle)
+        for cr_bun in to_be_created:
+            self.obj_create(bundle=cr_bun)
+
+        for up_agrs in to_be_updated:
+            self.update_in_place(*up_agrs)
 
         deleted_collection = deserialized.get(deleted_collection_name, [])
 
         if deleted_collection:
             if 'delete' not in self._meta.detail_allowed_methods:
                 raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response('delete'))
+            to_be_deleted = []
 
             for uri in deleted_collection:
-                obj = self.get_via_uri(uri, request=request)
-                bundle = self.build_bundle(obj=obj, request=request)
-                self.obj_delete(bundle=bundle)
-
+                try:
+                    obj = self.get_via_uri(uri, request=request)
+                    bundle = self.build_bundle(obj=obj, request=request)
+                    to_be_deleted.append(bundle)
+                except ObjectDoesNotExist:
+                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_response_notfound_class()("Couldn't find instace for uri: %s" % uri))
+                except MultipleObjectsReturned:
+                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_bad_request_response_class()("Couldn't find instace for uri: %s" % uri))
+            for del_bundle in to_be_deleted:
+                self.obj_delete(bundle=del_bundle)
         response_class = self._meta.response_router_obj[request].get_accepted_response_class()
         if not self._meta.always_return_data:
             return response_class()
         else:
             to_be_serialized = {}
-            to_be_serialized['objects'] = [self.full_dehydrate(bundle) for bundle in bundles_seen]
+            to_be_serialized['objects'] = [self.full_dehydrate(bundle,for_list=True) for bundle in bundles_seen]
             to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
             return self.create_response(request, to_be_serialized, response_class=response_class)
 

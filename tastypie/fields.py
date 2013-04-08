@@ -418,7 +418,6 @@ class DateTimeField(ApiField):
 
     def hydrate(self, bundle):
         value = super(DateTimeField, self).hydrate(bundle)
-
         if value and not hasattr(value, 'year'):
             try:
                 # Try to rip a date/datetime out of it.
@@ -633,6 +632,14 @@ class RelatedField(ApiField):
     def get_obj_from_data(self, resource, bundle, **kwargs):
         if not bundle.obj or not resource.get_bundle_detail_data(bundle):
             try:
+                if 'resource_uri' in kwargs:
+                    return resource.get_via_uri(kwargs['resource_uri'],request)
+            except: pass
+            try:
+                if 'id' in kwargs:
+                    return resource.obj_get(bundle,id=kwargs['id'])
+            except: pass
+            try:
                 lookup_kwargs = resource.lookup_kwargs_with_identifiers(bundle, kwargs)
             except:
                 # if there is trouble hydrating the data, fall back to just
@@ -726,13 +733,22 @@ class RelatedField(ApiField):
             bundle = self.resource_from_uri(self.fk_resource, value, **kwargs)
             if orig_bundle:
                 #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
-                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj)) 
+                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj))
             return bundle
         elif hasattr(value, 'items'):
             # We've got a data dictionary.
             # Since this leads to creation, this is the only one of these
             # methods that might care about "parent" data.
-            return self.resource_from_data(self.fk_resource, value, **kwargs)
+            if self.fk_resource._meta.create_on_related_fields:
+                return self.resource_from_data(self.fk_resource, value, **kwargs)
+            else:
+                if 'resource_uri' not in value:
+                    raise HydrationError("Related data provided for %s does not have resource_uri field" %self.instance_name)
+                bundle = self.resource_from_uri(self.fk_resource, value['resource_uri'], **kwargs)
+                if orig_bundle:
+                    #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
+                    orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj)) 
+                return bundle
         elif hasattr(value, 'pk'):
             # We've got an object with a primary key.
             bundle = self.resource_from_pk(self.fk_resource, value, **kwargs)
