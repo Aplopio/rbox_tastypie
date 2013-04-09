@@ -938,12 +938,19 @@ class Resource(object):
             chomped_uri = chomped_uri[len(prefix)-1:]
 
         try:
-            view, args, kwargs = resolve(chomped_uri)
+            view, view_args, view_kwargs = resolve(chomped_uri)
+            if self.parent_obj:
+                #am being used as a sub resource. Need to resolve correctly
+                rest_of_url = view_kwargs.pop('%s_rest_of_url'%self.parent_resource._meta.resource_name)
+                resolver = CustomRegexURLResolver(r'^', self.urls)
+                if rest_of_url[-1] != '/':
+                    rest_of_url = "%s%s" %(rest_of_url, trailing_slash())
+                view, view_args, view_kwargs = resolver.resolve(rest_of_url)
         except Resolver404:
             raise NotFound("The URL provided '%s' was not a link to a valid resource." % uri)
 
         bundle = self.build_bundle(request=request)
-        return self.obj_get(bundle=bundle, **self.remove_api_resource_names(kwargs))
+        return self.obj_get(bundle=bundle, **self.remove_api_resource_names(view_kwargs))
 
     # Data preparation.
 
