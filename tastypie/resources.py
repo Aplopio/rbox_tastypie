@@ -2198,12 +2198,13 @@ class ModelResource(Resource):
         return obj_list.order_by(*order_by_args)
 
     def build_exclude(self,request,filters):
-        exlude_filters = {}
+        exclude_filters = {}
         notequal = '__ne'
         for field, val in filters.items():
             if field.endswith(notequal):
                 exclude_filters[field[:-len(notequal)]]=val
-        return exlude_filters
+                filters.pop(field)
+        return exclude_filters
 
     def apply_filters(self, request, applicable_filters,exclude_filters):
         """
