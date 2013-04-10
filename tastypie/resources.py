@@ -2197,14 +2197,23 @@ class ModelResource(Resource):
 
         return obj_list.order_by(*order_by_args)
 
-    def apply_filters(self, request, applicable_filters):
+    def build_exclude(self,request,filters):
+        exlude_filters = {}
+        notequal = '__ne'
+        for field, val in filters.items():
+            if field.endswith(notequal):
+                exclude_filters[field[:-len(notequal)]]=val
+        return exlude_filters
+
+    def apply_filters(self, request, applicable_filters,exclude_filters):
         """
         An ORM-specific implementation of ``apply_filters``.
 
         The default simply applies the ``applicable_filters`` as ``**kwargs``,
         but should make it possible to do more advanced things.
         """
-        return self.get_object_list(request).filter(**applicable_filters)
+        return self.get_object_list(request).filter(**applicable_filters).exclude(
+            **exclude_filters)
 
     def get_query_optimizer_params(self, bundle, for_list=False): #passing request to maintain consistency with get_object_list
         prefetch_related_set = set([])
@@ -2281,9 +2290,10 @@ class ModelResource(Resource):
 
         # Update with the provided kwargs.
         filters.update(kwargs)
+        exclude_filters = self.build_exclude(bundle.request,filters)
         applicable_filters = self.build_filters(filters=filters,bundle=bundle)
         try:
-            objects = self.apply_filters(bundle.request, applicable_filters)
+            objects = self.apply_filters(bundle.request, applicable_filters, exclude_filters)
             objects = self.optimize_query(objects, bundle, for_list=True)
             return self.authorized_read_list(objects, bundle)
         except ValueError:
