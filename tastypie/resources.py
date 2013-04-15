@@ -25,9 +25,13 @@ from tastypie.utils import is_valid_jsonp_callback_value, dict_strip_unicode_key
 from tastypie.utils.mime import determine_format, build_content_type
 from tastypie.utils import get_current_func_name, get_request_class
 from tastypie.validation import Validation
+from tastypie.event_handler import EventHandler
 from tastypie import response_router_obj
 from django.core.exceptions import ImproperlyConfigured
 from django.core.urlresolvers import RegexURLResolver
+
+
+
 try:
     set
 except NameError:
@@ -79,6 +83,8 @@ class ResourceOptions(object):
     serializer = Serializer()
     authentication = Authentication()
     authorization = ReadOnlyAuthorization()
+    event_handler = EventHandler()
+
     cache = NoCache()
     throttle = BaseThrottle()
     validation = Validation()
@@ -421,7 +427,7 @@ class Resource(object):
         
         for name, field in self.fields.items():            
             if isinstance(field, fields.BaseSubResourceField):
-                include_urls = include(field.to(api_name=self._meta.api_name).urls)
+                include_urls = include(field.to_class(api_name=self._meta.api_name).urls)
                 url_list += [url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w[\w-]*)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls)]
         return url_list                
 
@@ -693,6 +699,8 @@ class Resource(object):
         request_method = request.method.lower()
         self._meta.throttle.accessed(self._meta.authentication.get_identifier(request), url=request.get_full_path(), request_method=request_method)
 
+
+
     def unauthorized_result(self, exception):
         raise ImmediateResponse(response=http.HttpUnauthorized())
 
@@ -791,6 +799,17 @@ class Resource(object):
             self.unauthorized_result(e)
 
         return auth_result
+
+    def fire_event(self, event_type, args=()):
+        """
+        Handles generation of event. Event manager object implemented in a 
+        subclass can handle doing appropriate work
+        """
+        object_list, bundle = args
+        event_function = getattr(self._meta.event_handler, event_type, None) if self._meta.event_handler else None
+        if event_function:
+            event_function(object_list, bundle)
+
 
     def build_bundle(self, obj=None, data=None, request=None, objects_saved=None):
         """
@@ -1419,6 +1438,8 @@ class Resource(object):
         paginator = self._meta.paginator_class(request.GET, sorted_objects, resource_uri=self.get_resource_uri(), limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
         to_be_serialized = paginator.page()
 
+        self.fire_event('pre_read_list', args=(to_be_serialized[self._meta.collection_name], base_bundle))
+
         # Dehydrate the bundles in preparation for serialization.
         bundles = []
 
@@ -1428,6 +1449,9 @@ class Resource(object):
 
         to_be_serialized[self._meta.collection_name] = bundles
         to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
+        self.fire_event('post_read_list', args=([bundle.obj for obj in \
+                to_be_serialized[self._meta.collection_name]], base_bundle))
+
         return self.create_response(request, to_be_serialized)
 
     def get_detail(self, request, **kwargs):
@@ -1449,8 +1473,10 @@ class Resource(object):
             return  self._meta.response_router_obj[request].get_multiple_choices_response("More than one resource is found at this URI.")
 
         bundle = self.build_bundle(obj=obj, request=request)
+        self.fire_event('pre_read_detail', args=(self.get_object_list(bundle.request), bundle))
         bundle = self.full_dehydrate(bundle)
         bundle = self.alter_detail_data_to_serialize(request, bundle)
+        self.fire_event('post_read_detail', args=(self.get_object_list(bundle.request), bundle))
         return self.create_response(request, bundle)
 
     def post_list(self, request, **kwargs):
@@ -1467,6 +1493,7 @@ class Resource(object):
         deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
         deserialized = self.alter_deserialized_detail_data(request, deserialized)
         bundle = self.build_bundle(data=dict_strip_unicode_keys(deserialized), request=request)
+
         updated_bundle = self.obj_create(bundle, **self.remove_api_resource_names(kwargs))
         location = self.get_resource_uri(updated_bundle)
 
@@ -1789,6 +1816,7 @@ class Resource(object):
                         pass
 
         original_bundle.data.update(**dict_strip_unicode_keys(new_data))
+        original_bundle.new_data = new_data
 
         # Now we've got a bundle with the new data sitting in it and we're
         # we're basically in the same spot as a PUT request. SO the rest of this
@@ -2335,8 +2363,11 @@ class ModelResource(Resource):
             setattr(bundle.obj, key, value)
 
         self.authorized_create_detail(self.get_object_list(bundle.request), bundle)
+        self.fire_event('pre_create_detail', args=(self.get_object_list(bundle.request), bundle))
         bundle = self.full_hydrate(bundle)
-        return self.save(bundle)
+        bundle = self.save(bundle)
+        self.fire_event('post_create_detail', args=(self.get_object_list(bundle.request), bundle))
+        return bundle
 
     def lookup_kwargs_with_identifiers(self, bundle, kwargs):
         """
@@ -2395,9 +2426,13 @@ class ModelResource(Resource):
                 bundle.obj = self.obj_get(bundle=bundle, _optimize_query=True, **lookup_kwargs)
             except ObjectDoesNotExist:
                 raise NotFound("A model instance matching the provided arguments could not be found.")
+
+        self.fire_event('pre_update_detail', args=(self.get_object_list(bundle.request), bundle))
         bundle = self.full_hydrate(bundle)
         self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
-        return self.save(bundle, skip_errors=skip_errors)
+        bundle = self.save(bundle, skip_errors=skip_errors)
+        self.fire_event('post_update_detail', args=(self.get_object_list(bundle.request), bundle))
+        return bundle
 
     def obj_delete_list(self, bundle, **kwargs):
         """
@@ -2405,6 +2440,7 @@ class ModelResource(Resource):
         """
         objects_to_delete = self.obj_get_list(bundle=bundle, **kwargs)
         deletable_objects = self.authorized_delete_list(objects_to_delete, bundle)
+        self.fire_event('pre_delete_list', args=(deletable_objects, bundle))
 
         if hasattr(deletable_objects, 'delete'):
             # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
@@ -2412,6 +2448,7 @@ class ModelResource(Resource):
         else:
             for authed_obj in deletable_objects:
                 authed_obj.delete()
+        self.fire_event('post_delete_list', args=(deletable_objects, bundle))
 
     def obj_delete_list_for_update(self, bundle, **kwargs):
         """
@@ -2419,13 +2456,14 @@ class ModelResource(Resource):
         """
         objects_to_delete = self.obj_get_list(bundle=bundle, **kwargs)
         deletable_objects = self.authorized_update_list(objects_to_delete, bundle)
-
+        self.fire_event('pre_update_list', args=(deletable_objects, bundle))
         if hasattr(deletable_objects, 'delete'):
             # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
             deletable_objects.delete()
         else:
             for authed_obj in deletable_objects:
                 authed_obj.delete()
+        self.fire_event('post_update_list', args=(deletable_objects, bundle))
 
     def obj_delete(self, bundle, **kwargs):
         """
@@ -2441,7 +2479,9 @@ class ModelResource(Resource):
                 raise NotFound("A model instance matching the provided arguments could not be found.")
 
         self.authorized_delete_detail(self.get_object_list(bundle.request), bundle)
+        self.fire_event('pre_delete_detail', args=(self.get_object_list(bundle.request), bundle))
         bundle.obj.delete()
+        self.fire_event('post_delete_detail', args=(self.get_object_list(bundle.request), bundle))
 
     @transaction.commit_on_success()
     def patch_list(self, request, **kwargs):
