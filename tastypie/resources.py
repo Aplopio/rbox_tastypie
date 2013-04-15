@@ -390,7 +390,7 @@ class Resource(object):
             return self._meta.response_router_obj[request].get_not_found_response()
         
         for field in sub_resource_field_list:
-            sub_resource_cls = field.to
+            sub_resource_cls = field.to_class
             sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self, 
                     parent_pk=pk, parent_obj=parent_obj, parent_field=field.attribute)
             try:
