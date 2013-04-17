@@ -9,7 +9,7 @@ from django import forms as djangoform
 from django.utils import datetime_safe, importlib
 from django.core.urlresolvers import resolve
 from tastypie.bundle import Bundle
-from tastypie.exceptions import ApiFieldError, NotFound
+from tastypie.exceptions import ApiFieldError, NotFound, HydrationError
 from tastypie.utils import dict_strip_unicode_keys, make_aware
 
 
@@ -743,7 +743,7 @@ class RelatedField(ApiField):
                 return self.resource_from_data(self.fk_resource, value, **kwargs)
             else:
                 if 'resource_uri' not in value:
-                    raise HydrationError("Related data provided for %s does not have resource_uri field" %self.instance_name)
+                    raise ApiFieldError("Related data provided for %s does not have resource_uri field" %self.instance_name)
                 bundle = self.resource_from_uri(self.fk_resource, value['resource_uri'], **kwargs)
                 if orig_bundle:
                     #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
