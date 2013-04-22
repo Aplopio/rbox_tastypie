@@ -24,7 +24,14 @@ DATETIME_REGEX = re.compile('^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(T|
 
 class AllowEverythingMultipleChoiceField(forms.MultipleChoiceField):
     def clean(self, value):
-        return value
+        if type(value) ==list:
+            for validator in self.validators:
+                validator(value)
+            return value
+        elif not self.required and value==None:
+            return value
+        else:
+            raise forms.ValidationError("Expects a list,'%s' given." % type(value))
 
 class AllowEverythingChoiceField(forms.ChoiceField):
     def clean(self, value):
