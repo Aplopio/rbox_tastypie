@@ -26,6 +26,7 @@ from tastypie.utils.mime import determine_format, build_content_type
 from tastypie.utils import get_current_func_name, get_request_class
 from tastypie.validation import Validation
 from tastypie.event_handler import EventHandler
+from tastypie.bundle_pre_processor import BundlePreProcessor
 from tastypie import response_router_obj
 from django.core.exceptions import ImproperlyConfigured
 from django.core.urlresolvers import RegexURLResolver
@@ -83,6 +84,7 @@ class ResourceOptions(object):
     serializer = Serializer()
     authentication = Authentication()
     authorization = ReadOnlyAuthorization()
+    bundle_pre_processor = BundlePreProcessor()
     event_handler = EventHandler()
 
     cache = NoCache()
@@ -800,6 +802,18 @@ class Resource(object):
 
         return auth_result
 
+    def preprocess(self, event_type, bundle):
+        """
+        Handles pre processing. Event manager object implemented in a 
+        subclass can handle doing appropriate work
+        """
+        pre_processor = getattr(self._meta.bundle_pre_processor, event_type, None) if self._meta.bundle_pre_processor else None
+        if pre_processor:
+            #event function modifies the bundle, object_list
+            bundle = pre_processor(bundle)
+        return bundle
+
+
     def fire_event(self, event_type, args=()):
         """
         Handles generation of event. Event manager object implemented in a 
@@ -1438,7 +1452,7 @@ class Resource(object):
         paginator = self._meta.paginator_class(request.GET, sorted_objects, resource_uri=self.get_resource_uri(), limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
         to_be_serialized = paginator.page()
 
-        self.fire_event('pre_read_list', args=(to_be_serialized[self._meta.collection_name], base_bundle))
+        base_bundle = self.preprocess('read_list', base_bundle)
 
         # Dehydrate the bundles in preparation for serialization.
         bundles = []
@@ -1448,7 +1462,7 @@ class Resource(object):
 
         to_be_serialized[self._meta.collection_name] = bundles
         to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
-        self.fire_event('post_read_list', args=([bundle.obj for obj in \
+        self.fire_event('list_read', args=([bundle.obj for obj in \
                 to_be_serialized[self._meta.collection_name]], base_bundle))
 
         return self.create_response(request, to_be_serialized)
@@ -1472,10 +1486,10 @@ class Resource(object):
             return  self._meta.response_router_obj[request].get_multiple_choices_response("More than one resource is found at this URI.")
 
         bundle = self.build_bundle(obj=obj, request=request)
-        self.fire_event('pre_read_detail', args=(self.get_object_list(bundle.request), bundle))
+        bundle = self.preprocess('read_detail', bundle)
         bundle = self.full_dehydrate(bundle)
         bundle = self.alter_detail_data_to_serialize(request, bundle)
-        self.fire_event('post_read_detail', args=(self.get_object_list(bundle.request), bundle))
+        self.fire_event('detail_read', args=(self.get_object_list(bundle.request), bundle))
         return self.create_response(request, bundle)
 
     def post_list(self, request, **kwargs):
@@ -2363,10 +2377,10 @@ class ModelResource(Resource):
             setattr(bundle.obj, key, value)
 
         self.authorized_create_detail(self.get_object_list(bundle.request), bundle)
-        self.fire_event('pre_create_detail', args=(self.get_object_list(bundle.request), bundle))
+        bundle = self.preprocess('create_detail', bundle)
         bundle = self.full_hydrate(bundle)
         bundle = self.save(bundle)
-        self.fire_event('post_create_detail', args=(self.get_object_list(bundle.request), bundle))
+        self.fire_event('detail_created', args=(self.get_object_list(bundle.request), bundle))
         return bundle
 
     def lookup_kwargs_with_identifiers(self, bundle, kwargs):
@@ -2427,11 +2441,11 @@ class ModelResource(Resource):
             except ObjectDoesNotExist:
                 raise NotFound("A model instance matching the provided arguments could not be found.")
 
-        self.fire_event('pre_update_detail', args=(self.get_object_list(bundle.request), bundle))
+        bundle = self.preprocess('update_detail', bundle)
         bundle = self.full_hydrate(bundle)
         self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
         bundle = self.save(bundle, skip_errors=skip_errors)
-        self.fire_event('post_update_detail', args=(self.get_object_list(bundle.request), bundle))
+        self.fire_event('detail_updated', args=(self.get_object_list(bundle.request), bundle))
         return bundle
 
     def obj_delete_list(self, bundle, **kwargs):
@@ -2440,7 +2454,7 @@ class ModelResource(Resource):
         """
         objects_to_delete = self.obj_get_list(bundle=bundle, **kwargs)
         deletable_objects = self.authorized_delete_list(objects_to_delete, bundle)
-        self.fire_event('pre_delete_list', args=(deletable_objects, bundle))
+        bundle = self.preprocess('delete_list', bundle)
 
         if hasattr(deletable_objects, 'delete'):
             # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
@@ -2448,7 +2462,7 @@ class ModelResource(Resource):
         else:
             for authed_obj in deletable_objects:
                 authed_obj.delete()
-        self.fire_event('post_delete_list', args=(deletable_objects, bundle))
+        self.fire_event('list_deleted', args=(deletable_objects, bundle))
 
     def obj_delete_list_for_update(self, bundle, **kwargs):
         """
@@ -2456,14 +2470,14 @@ class ModelResource(Resource):
         """
         objects_to_delete = self.obj_get_list(bundle=bundle, **kwargs)
         deletable_objects = self.authorized_update_list(objects_to_delete, bundle)
-        self.fire_event('pre_update_list', args=(deletable_objects, bundle))
+        bundle = self.preprocess('update_list', bundle)
         if hasattr(deletable_objects, 'delete'):
             # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
             deletable_objects.delete()
         else:
             for authed_obj in deletable_objects:
                 authed_obj.delete()
-        self.fire_event('post_update_list', args=(deletable_objects, bundle))
+        self.fire_event('list_updated', args=(deletable_objects, bundle))
 
     def obj_delete(self, bundle, **kwargs):
         """
@@ -2479,9 +2493,9 @@ class ModelResource(Resource):
                 raise NotFound("A model instance matching the provided arguments could not be found.")
 
         self.authorized_delete_detail(self.get_object_list(bundle.request), bundle)
-        self.fire_event('pre_delete_detail', args=(self.get_object_list(bundle.request), bundle))
+        bundle = self.preprocess('delete_detail', bundle)
         bundle.obj.delete()
-        self.fire_event('post_delete_detail', args=(self.get_object_list(bundle.request), bundle))
+        self.fire_event('detail_deleted', args=(self.get_object_list(bundle.request), bundle))
 
     @transaction.commit_on_success()
     def patch_list(self, request, **kwargs):

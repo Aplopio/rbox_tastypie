@@ -16,16 +16,7 @@ class EventHandler(object):
         self.resource_meta = instance
         return self
 
-    #Get method handlers
-    def pre_read_list(self, object_list, bundle):
-        """
-        Called before get_list is executed.
-        object_list: list of authorized objects that can be read by the user
-        bundle: plain bundle - does not have obj or data populated
-        """
-        pass
-
-    def post_read_list(self, object_list, bundle):
+    def list_read(self, object_list, bundle):
         """
         Called after get_list is executed.
         object_list: list of authorized objects that can be read by the user
@@ -33,16 +24,7 @@ class EventHandler(object):
         """
         pass
 
-    def pre_read_detail(self, object_list, bundle):
-        """
-        Called before dehydrate object is executed.
-        object_list: list of authorized objects that can be read by the user
-        bundle: bundle - bundle.obj is the object being requested. dehydration is not yet called
-        """
-
-        pass
-
-    def post_read_detail(self, object_list, bundle):
+    def detail_read(self, object_list, bundle):
         """
         Called after dehydrate object is executed.
         object_list: list of authorized objects that can be read by the user
@@ -55,45 +37,27 @@ class EventHandler(object):
     #Post method handlers
     '''
     #Not implemented currently
-    def pre_create_list(self, object_list, bundle):
-        pass
-
-    def post_create_list(self, object_list, bundle):
+    def list_created(self, object_list, bundle):
         pass
     '''
 
-    def pre_create_detail(self, object_list, bundle):
-        pass
-
-    def post_create_detail(self, object_list, bundle):
+    def detail_created(self, object_list, bundle):
         pass
 
     #put method handlers
-    def pre_update_detail(self, object_list, bundle):
+    def detail_updated(self, object_list, bundle):
         pass
 
-    def post_update_detail(self, object_list, bundle):
+    def list_updated(self, object_list, bundle):
         pass
-
-    def pre_update_list(self, object_list, bundle):
-        pass
-
-    def post_update_list(self, object_list, bundle):
-        pass
-
 
     #delete method handlers
-    def pre_delete_list(self, object_list, bundle):
+    def list_deleted(self, object_list, bundle):
         pass
 
-    def post_delete_list(self, object_list, bundle):
+    def detail_deleted(self, object_list, bundle):
         pass
 
-    def pre_delete_detail(self, object_list, bundle):
-        pass
-
-    def post_delete_detail(self, object_list, bundle):
-        pass
 
 
 class MultiEventHandler(EventHandler):
@@ -149,66 +113,34 @@ class MultiEventHandler(EventHandler):
     def delete_detail_handlers(self):
         return self.get_event_handlers()
 
-
-    def pre_read_list(self, object_list, bundle):
+    def list_read(self, object_list, bundle):
         for event_handler in self.read_list_handlers():
-            event_handler.pre_read_list(object_list, bundle)
+            event_handler.list_read(object_list, bundle)
 
-    def post_read_list(self, object_list, bundle):
-        for event_handler in self.read_list_handlers():
-            event_handler.post_read_list(object_list, bundle)
-
-    def pre_read_detail(self, object_list, bundle):
+    def detail_read(self, object_list, bundle):
         for event_handler in self.read_detail_handlers():
-            event_handler.pre_read_detail(object_list, bundle)
+            event_handler.detail_read(object_list, bundle)
 
-    def post_read_detail(self, object_list, bundle):
-        for event_handler in self.read_detail_handlers():
-            event_handler.post_read_detail(object_list, bundle)
 
     #Post method handlers
-    def pre_create_detail(self, object_list, bundle):
+    def detail_created(self, object_list, bundle):
         for ev in self.create_detail_handlers():
-            ev.pre_create_detail(object_list, bundle)
-
-    def post_create_detail(self, object_list, bundle):
-        for ev in self.create_detail_handlers():
-            ev.post_create_detail(object_list, bundle)
+            ev.detail_created(object_list, bundle)
 
     #put method handlers
-    def pre_update_detail(self, object_list, bundle):
+    def detail_updated(self, object_list, bundle):
         for ev in self.update_detail_handlers():
-            ev.pre_update_detail(object_list, bundle)
+            ev.detail_updated(object_list, bundle)
 
-    def post_update_detail(self, object_list, bundle):
-        for ev in self.update_detail_handlers():
-            ev.post_update_detail(object_list, bundle)
-
-    def pre_update_list(self, object_list, bundle):
+    def list_updated(self, object_list, bundle):
         for ev in self.update_list_handlers():
-            ev.pre_update_list(object_list, bundle)
-
-    def post_update_list(self, object_list, bundle):
-        for ev in self.update_list_handlers():
-            ev.post_update_list(object_list, bundle)
-
+            ev.list_updated(object_list, bundle)
 
     #delete method handlers
-    def pre_delete_list(self, object_list, bundle):
+    def list_deleted(self, object_list, bundle):
         for ev in self.delete_list_handlers():
-            ev.pre_delete_list(object_list, bundle)
+            ev.list_deleted(object_list, bundle)
 
-    def post_delete_list(self, object_list, bundle):
-        for ev in self.delete_list_handlers():
-            ev.post_delete_list(object_list, bundle)
-
-    def pre_delete_detail(self, object_list, bundle):
+    def detail_deleted(self, object_list, bundle):
         for ev in self.delete_detail_handlers():
-            ev.pre_delete_detail(object_list, bundle)
-
-    def post_delete_detail(self, object_list, bundle):
-        for ev in self.delete_detail_handlers():
-            ev.post_delete_detail(object_list, bundle)
-
-
-
+            ev.detail_deleted(object_list, bundle)
