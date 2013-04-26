@@ -819,6 +819,9 @@ class ToOneField(RelatedField):
         elif callable(self.attribute):
             foreign_obj = self.attribute(bundle)
 
+        if callable(foreign_obj):
+            foreign_obj = foreign_obj()
+
         if not foreign_obj:
             if not self.null:
                 raise ApiFieldError("The model '%r' has an empty attribute '%s' and doesn't allow a null value." % (previous_obj, attr))
