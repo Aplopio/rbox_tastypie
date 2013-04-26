@@ -1442,7 +1442,6 @@ class Resource(object):
 
         # Dehydrate the bundles in preparation for serialization.
         bundles = []
-
         for obj in to_be_serialized[self._meta.collection_name]:
             bundle = self.build_bundle(obj=obj, request=request)
             bundles.append(self.full_dehydrate(bundle, for_list=True))
@@ -2277,7 +2276,8 @@ class ModelResource(Resource):
                     for attr in field_attr_to_related_attr_converter(field_object.attribute):
                         select_related_set.add(attr)
 
-                if getattr(field_object, 'is_related', False):
+                if getattr(field_object, 'is_related', False) and getattr(field_object,
+                                                                          'full', False):
                     sub_resource_cls = field_object.to_class
                     sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name)
                     sr_prefetch_related_set, sr_select_related_set = sub_resource_obj.get_query_optimizer_params(bundle, for_list=for_list)
