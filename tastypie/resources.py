@@ -1763,6 +1763,7 @@ class Resource(object):
                     raise ImmediateResponse(response=self._meta.response_router_obj[request].get_bad_request_response_class()("Couldn't find instace for uri: %s" % uri))
             for del_bundle in to_be_deleted:
                 self.obj_delete(bundle=del_bundle)
+        self.fire_event('list_updated', args=(self.get_object_list(request), self.build_bundle(request=request)))
         response_class = self._meta.response_router_obj[request].get_accepted_response_class()
         if not self._meta.always_return_data:
             return response_class()
@@ -2477,7 +2478,6 @@ class ModelResource(Resource):
         else:
             for authed_obj in deletable_objects:
                 authed_obj.delete()
-        self.fire_event('list_updated', args=(deletable_objects, bundle))
 
     def obj_delete(self, bundle, **kwargs):
         """
