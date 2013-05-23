@@ -2141,7 +2141,6 @@ class ModelResource(Resource):
         # Accepts the filters as a dict. None by default, meaning no filters.
         if filters is None:
             filters = {}
-
         qs_filters = {}
 
         if getattr(self._meta, 'queryset', None) is not None:

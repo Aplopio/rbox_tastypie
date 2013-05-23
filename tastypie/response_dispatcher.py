@@ -19,6 +19,9 @@ class HttpResponseDispatcher(object):
     def get_unauthorized_response_class(self):
         return http.HttpUnauthorized
 
+    def get_see_other_response_class(self):
+        return http.HttpSeeOther
+
     def handle_cache_control(self, response, **kwargs):
         # IE excessively caches XMLHttpRequests, so we're disabling
         # the browser cache here.

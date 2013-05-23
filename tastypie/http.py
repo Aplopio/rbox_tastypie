@@ -1,7 +1,7 @@
 """
 The various HTTP responses for use in returning proper HTTP codes.
 """
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 
 
 class HttpCreated(HttpResponse):
@@ -26,8 +26,8 @@ class HttpMultipleChoices(HttpResponse):
     status_code = 300
 
 
-class HttpSeeOther(HttpResponse):
-    status_code = 303
+class HttpSeeOther(HttpResponseRedirect):
+    status_code = 302
 
 
 class HttpNotModified(HttpResponse):
