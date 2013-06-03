@@ -401,7 +401,7 @@ class Resource(object):
                     manager=getattr(manager,att)
                 sub_resource_obj._meta.queryset = manager.all()
             except AttributeError: #Happens when this is ToOneSubResourceField
-                sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.none()
+                sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.filter(pk=manager.id) #manager refers to the one to one id
             resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
             try:
                 if rest_of_url[-1] != '/':
