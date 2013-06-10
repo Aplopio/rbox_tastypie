@@ -1414,7 +1414,7 @@ class Resource(object):
         errors = self._meta.validation.is_valid(bundle, bundle.request)
 
         if errors:
-            bundle.errors[self._meta.resource_name] = errors
+            bundle.errors = errors
             return False
 
         return True
