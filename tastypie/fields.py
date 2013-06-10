@@ -804,9 +804,7 @@ class ToOneField(RelatedField):
         self.fk_resource = None
 
     def resource_from_data(self, fk_resource, data, request=None, related_obj=None, related_name=None):
-        data[related_name] = related_obj #improving query ability
         return super(ToOneField, self).resource_from_data(fk_resource, data, request, related_obj, related_name)
-
 
     def dehydrate(self, bundle):
         foreign_obj = None
