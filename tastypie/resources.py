@@ -1,4 +1,5 @@
 from __future__ import with_statement
+import simplejson
 import logging
 import warnings
 import django
@@ -15,7 +16,7 @@ from tastypie.authorization import ReadOnlyAuthorization
 from tastypie.bundle import Bundle
 from tastypie.cache import NoCache
 from tastypie.constants import ALL, ALL_WITH_RELATIONS
-from tastypie.exceptions import NotFound, BadRequest, InvalidFilterError, HydrationError, InvalidSortError, ImmediateResponse, Unauthorized
+from tastypie.exceptions import NotFound, BadRequest, InvalidFilterError, HydrationError, InvalidSortError, ImmediateResponse, Unauthorized, Forbidden
 from tastypie import fields
 from tastypie import http
 from tastypie.paginator import Paginator
@@ -706,6 +707,12 @@ class Resource(object):
     def unauthorized_result(self, exception):
         raise ImmediateResponse(response=http.HttpUnauthorized())
 
+    def forbidden_result(self, exception):
+        raise ImmediateResponse(HttpResponse(simplejson.dumps({
+                                    "error_type":exception.error_type,
+                                    "error_message":exception.error_message
+                                }), status=403))
+
     def authorized_read_list(self, object_list, bundle):
         """
         Handles checking of permissions to see if the user has authorization
@@ -715,6 +722,8 @@ class Resource(object):
             auth_result = self._meta.authorization.read_list(object_list, bundle)
         except Unauthorized, e:
             self.unauthorized_result(e)
+        except Forbidden, e:
+            self.forbidden_result(e)
 
         return auth_result
 
@@ -728,6 +737,8 @@ class Resource(object):
         except Unauthorized, e:
             self.unauthorized_result(e)
 
+        except Forbidden, e:
+            self.forbidden_result(e)
         return auth_result
 
     def authorized_create_list(self, object_list, bundle):
@@ -739,6 +750,8 @@ class Resource(object):
             auth_result = self._meta.authorization.create_list(object_list, bundle)
         except Unauthorized, e:
             self.unauthorized_result(e)
+        except Forbidden, e:
+            self.forbidden_result(e)
 
         return auth_result
 
@@ -751,7 +764,8 @@ class Resource(object):
             auth_result = self._meta.authorization.create_detail(object_list, bundle)
         except Unauthorized, e:
             self.unauthorized_result(e)
-
+        except Forbidden, e:
+            self.forbidden_result(e)
         return auth_result
 
     def authorized_update_list(self, object_list, bundle):
@@ -763,6 +777,8 @@ class Resource(object):
             auth_result = self._meta.authorization.update_list(object_list, bundle)
         except Unauthorized, e:
             self.unauthorized_result(e)
+        except Forbidden, e:
+            self.forbidden_result(e)
 
         return auth_result
 
@@ -775,6 +791,8 @@ class Resource(object):
             auth_result = self._meta.authorization.update_detail(object_list, bundle)
         except Unauthorized, e:
             self.unauthorized_result(e)
+        except Forbidden, e:
+            self.forbidden_result(e)
 
         return auth_result
 
@@ -787,6 +805,8 @@ class Resource(object):
             auth_result = self._meta.authorization.delete_list(object_list, bundle)
         except Unauthorized, e:
             self.unauthorized_result(e)
+        except Forbidden, e:
+            self.forbidden_result(e)
 
         return auth_result
 
@@ -799,6 +819,8 @@ class Resource(object):
             auth_result = self._meta.authorization.delete_detail(object_list, bundle)
         except Unauthorized, e:
             self.unauthorized_result(e)
+        except Forbidden, e:
+            self.forbidden_result(e)
 
         return auth_result
 
