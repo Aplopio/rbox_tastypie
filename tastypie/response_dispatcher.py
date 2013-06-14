@@ -10,6 +10,9 @@ class HttpResponseDispatcher(object):
     def get_application_error_class(self):
         return http.HttpApplicationError
 
+    def get_forbidden_response_class(self):
+        return http.HttpForbidden
+
     def get_response_notfound_class(self):
         return http.HttpNotFound
 
