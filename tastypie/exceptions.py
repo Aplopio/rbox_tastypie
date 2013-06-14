@@ -98,3 +98,11 @@ class ImmediateResponse(TastypieError):
     @property
     def response(self):
         return self._response
+
+
+class Forbidden(TastypieError):
+    """
+    """
+    def __init__(self,error_type,error_message):
+        self.error_message = error_message
+        self.error_type = error_type
