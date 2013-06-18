@@ -1002,7 +1002,13 @@ class ToManyField(RelatedField):
     def get_related_mngr(self, bundle):
         related_mngr = None
         if isinstance(self.attribute, basestring):
-            related_mngr = getattr(bundle.obj, self.attribute)
+            current_obj = bundle.obj
+            for attr in self.attribute.split('__'):
+                try:
+                    current_obj = getattr(current_obj, attr)
+                    related_mngr = current_obj
+                except ObjectDoesNotExist:
+                    return None
         elif callable(self.attribute):
             related_mngr = self.attribute(bundle)
 
