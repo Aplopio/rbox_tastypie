@@ -1763,6 +1763,7 @@ class Resource(object):
 
         for cr_bun in to_be_created:
             self.obj_create(bundle=cr_bun)
+            bundles_seen.append(cr_bun)
 
         for up_agrs in to_be_updated:
             self.update_in_place(*up_agrs)
