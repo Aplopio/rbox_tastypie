@@ -704,14 +704,15 @@ class Resource(object):
 
 
 
-    def unauthorized_result(self, exception):
-        raise ImmediateResponse(response=http.HttpUnauthorized())
+    def unauthorized_result(self, request, exception):
+        raise ImmediateResponse(response=self._meta.response_router_obj[request].get_unauthorized_request_response())
 
-    def forbidden_result(self, exception):
-        raise ImmediateResponse(HttpResponse(simplejson.dumps({
-                                    "error_type":exception.error_type,
-                                    "error_message":exception.error_message
-                                }), status=403))
+    def forbidden_result(self, request, exception):
+        response_class = self._meta.response_router_obj[request].get_forbidden_response_class()
+        errors = {"error_type":exception.error_type,
+                 "error_message":exception.error_message}
+        response=self.error_response(request, errors, response_class=response_class)
+        raise ImmediateResponse(response)
 
     def authorized_read_list(self, object_list, bundle):
         """
@@ -721,9 +722,9 @@ class Resource(object):
         try:
             auth_result = self._meta.authorization.read_list(object_list, bundle)
         except Unauthorized, e:
-            self.unauthorized_result(e)
+            self.unauthorized_result(bundle.request, e)
         except Forbidden, e:
-            self.forbidden_result(e)
+            self.forbidden_result(bundle.request, e)
 
         return auth_result
 
@@ -735,10 +736,9 @@ class Resource(object):
         try:
             auth_result = self._meta.authorization.read_detail(object_list, bundle)
         except Unauthorized, e:
-            self.unauthorized_result(e)
-
+            self.unauthorized_result(bundle.request, e)
         except Forbidden, e:
-            self.forbidden_result(e)
+            self.forbidden_result(bundle.request,e)
         return auth_result
 
     def authorized_create_list(self, object_list, bundle):
@@ -749,9 +749,9 @@ class Resource(object):
         try:
             auth_result = self._meta.authorization.create_list(object_list, bundle)
         except Unauthorized, e:
-            self.unauthorized_result(e)
+            self.unauthorized_result(bundle.request,e)
         except Forbidden, e:
-            self.forbidden_result(e)
+            self.forbidden_result(bundle.request,e)
 
         return auth_result
 
@@ -763,9 +763,9 @@ class Resource(object):
         try:
             auth_result = self._meta.authorization.create_detail(object_list, bundle)
         except Unauthorized, e:
-            self.unauthorized_result(e)
+            self.unauthorized_result(bundle.request,e)
         except Forbidden, e:
-            self.forbidden_result(e)
+            self.forbidden_result(bundle.request,e)
         return auth_result
 
     def authorized_update_list(self, object_list, bundle):
@@ -776,9 +776,9 @@ class Resource(object):
         try:
             auth_result = self._meta.authorization.update_list(object_list, bundle)
         except Unauthorized, e:
-            self.unauthorized_result(e)
+            self.unauthorized_result(bundle.request,e)
         except Forbidden, e:
-            self.forbidden_result(e)
+            self.forbidden_result(bundle.request,e)
 
         return auth_result
 
@@ -790,9 +790,9 @@ class Resource(object):
         try:
             auth_result = self._meta.authorization.update_detail(object_list, bundle)
         except Unauthorized, e:
-            self.unauthorized_result(e)
+            self.unauthorized_result(bundle.request,e)
         except Forbidden, e:
-            self.forbidden_result(e)
+            self.forbidden_result(bundle.request,e)
 
         return auth_result
 
@@ -804,9 +804,9 @@ class Resource(object):
         try:
             auth_result = self._meta.authorization.delete_list(object_list, bundle)
         except Unauthorized, e:
-            self.unauthorized_result(e)
+            self.unauthorized_result(bundle.request,e)
         except Forbidden, e:
-            self.forbidden_result(e)
+            self.forbidden_result(bundle.request,e)
 
         return auth_result
 
@@ -818,9 +818,9 @@ class Resource(object):
         try:
             auth_result = self._meta.authorization.delete_detail(object_list, bundle)
         except Unauthorized, e:
-            self.unauthorized_result(e)
+            self.unauthorized_result(bundle.request,e)
         except Forbidden, e:
-            self.forbidden_result(e)
+            self.forbidden_result(bundle.request,e)
 
         return auth_result
 
