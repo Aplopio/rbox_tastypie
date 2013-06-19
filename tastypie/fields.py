@@ -699,7 +699,6 @@ class RelatedField(ApiField):
             #return fk_resource.full_hydrate(fk_bundle)
 
         fk_bundle = fk_resource.full_hydrate(fk_bundle)
-        fk_resource.is_valid(fk_bundle)
         return fk_bundle
 
     def resource_from_pk(self, fk_resource, obj, request=None, related_obj=None, related_name=None):

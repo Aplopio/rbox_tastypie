@@ -1433,7 +1433,48 @@ class Resource(object):
         If validation fails, an error is raised with the error messages
         serialized inside it.
         """
-        errors = self._meta.validation.is_valid(bundle, bundle.request)
+
+        def get_related_bundle(related_resource, value, bundle):
+            if isinstance(value, Bundle):
+                return value
+            else:
+                return related_resource.build_bundle(obj=None, data=bundle.data.get(field_name,{}), 
+                    request=bundle.request)
+
+
+        errors = self._meta.validation.is_valid(bundle, bundle.request) or {}
+
+        for field_name, field_object in self.fields.items():
+
+            if not getattr(field_object, 'is_related', False):
+                continue
+
+            if getattr(field_object, 'is_m2m', False):
+                continue
+
+            if field_object.readonly:
+                continue
+
+            if not field_object.attribute:
+                continue
+
+            if field_object.blank and not bundle.data.has_key(field_name):
+                continue
+
+            related_resource = field_object.get_related_resource(bundle.obj)
+            if not related_resource._meta.create_on_related_fields:
+                continue
+            if getattr(field_object, 'is_m2m', False):
+                for data in bundle.data.get(field_name,[]):
+                    related_bundle = get_related_bundle(related_resource, data, bundle)
+                    related_bundle_valid = related_resource.is_valid(related_bundle)
+                    if not related_bundle_valid:
+                        errors.get(field_name,[]).append(related_bundle.errors)
+            else:
+                related_bundle = get_related_bundle(related_resource, bundle.data.get(field_name,{}), bundle)
+                related_bundle_valid = related_resource.is_valid(related_bundle)
+                if not related_bundle_valid:
+                    errors[field_name] = related_bundle.errors
 
         if errors:
             bundle.errors = errors
