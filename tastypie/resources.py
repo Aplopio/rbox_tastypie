@@ -112,7 +112,7 @@ class ResourceOptions(object):
     always_return_data = False
     collection_name = 'objects'
     detail_uri_name = 'pk'
-    create_on_related_fields = True
+    create_on_related_fields = False 
 
     prefetch_related = [] 
     select_related = []
@@ -1438,7 +1438,11 @@ class Resource(object):
             if isinstance(value, Bundle):
                 return value
             else:
-                return related_resource.build_bundle(obj=None, data=bundle.data.get(field_name,{}), 
+                data = bundle.data.get(field_name,{})
+                if isinstance(data, basestring):
+                    #happens incase of a toonefield
+                    data = {'resource_uri':data}
+                return related_resource.build_bundle(obj=None, data=data, 
                     request=bundle.request)
 
 
@@ -1458,7 +1462,7 @@ class Resource(object):
             if not field_object.attribute:
                 continue
 
-            if field_object.blank and not bundle.data.has_key(field_name):
+            if field_object.blank and (not bundle.data.has_key(field_name) or bundle.data.get(field_name) is None):
                 continue
 
             related_resource = field_object.get_related_resource(bundle.obj)
