@@ -364,7 +364,7 @@ class Resource(object):
             url(r"^(?P<resource_name>%s)%s$" % (self._meta.resource_name, trailing_slash()), self.wrap_view('dispatch_list'), name="api_dispatch_list"),
             url(r"^(?P<resource_name>%s)/schema%s$" % (self._meta.resource_name, trailing_slash()), self.wrap_view('get_schema'), name="api_get_schema"),
             url(r"^(?P<resource_name>%s)/set/(?P<%s_list>\w[\w/;-]*)%s$" % (self._meta.resource_name, self._meta.detail_uri_name, trailing_slash()), self.wrap_view('get_multiple'), name="api_get_multiple"),
-            url(r"^(?P<resource_name>%s)/(?P<%s>\w[\w/-]*)%s$" % (self._meta.resource_name, self._meta.detail_uri_name, trailing_slash()), self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
+            url(r"^(?P<resource_name>%s)/(?P<%s>\w+)%s$" % (self._meta.resource_name, self._meta.detail_uri_name, trailing_slash()), self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
         ]
 
     def override_urls(self):
@@ -423,16 +423,16 @@ class Resource(object):
                 sub_resource_field_list.append(field)
         if len(sub_resource_field_list) > 0:
             url_list += [
-                url(r"^(?P<resource_name>%s)/(?P<pk>\w[\w-]*)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name,
+                url(r"^(?P<resource_name>%s)/(?P<pk>\w+)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name,
                                                                                        self._meta.resource_name),
                     self.wrap_view('view_to_handle_subresource'), {'%s_sub_resource_field_list'%(self._meta.resource_name): sub_resource_field_list})
             ]
-        
-        for name, field in self.fields.items():            
+
+        for name, field in self.fields.items():
             if isinstance(field, fields.BaseSubResourceField):
                 include_urls = include(field.to_class(api_name=self._meta.api_name).urls)
-                url_list += [url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w[\w-]*)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls)]
-        return url_list                
+                url_list += [url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls)]
+        return url_list
 
 
     @property
@@ -445,7 +445,6 @@ class Resource(object):
         a URLconf should you choose to.
         """
         urls = self.prepend_urls()
-        urls += self.sub_resource_urls()
 
 
         overridden_urls = self.override_urls()
@@ -454,6 +453,7 @@ class Resource(object):
             urls += overridden_urls
 
         urls += self.base_urls()
+        urls += self.sub_resource_urls()
         urlpatterns = patterns('',
             *urls
         )
@@ -574,7 +574,7 @@ class Resource(object):
 
         if method is None:
             raise ImmediateResponse(response= self._meta.response_router_obj[request].get_not_implemented_response())
-        
+
         self.is_authenticated(request)
         self.throttle_check(request)
 
