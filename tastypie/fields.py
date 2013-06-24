@@ -455,7 +455,7 @@ class RelatedField(ApiField):
     is_related = True
     self_referential = False
     help_text = 'A related resource. Can be either a URI or set of nested resource data.'
-    
+
     @property
     def formfield(self):
         if getattr(self,'is_m2m',False):
@@ -506,7 +506,7 @@ class RelatedField(ApiField):
         is a callable, and returns ``True``, the field will be included during
         dehydration.
         Defaults to ``all``.
-        
+
         Optionally accepts a ``full_list``, which indicated whether or not
         data should be fully dehydrated when the request is for a list of
         resources. Accepts ``True``, ``False`` or a callable that accepts
@@ -561,7 +561,7 @@ class RelatedField(ApiField):
         Instaniates the related resource.
         """
         related_resource = self.to_class()
-        
+
         # Fix the ``api_name`` if it's not present.
         if related_resource._meta.api_name is None:
             if self._resource and not self._resource._meta.api_name is None:
@@ -731,7 +731,7 @@ class RelatedField(ApiField):
             # Already hydrated, probably nested bundles. Just return.
             if orig_bundle:
                 #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
-                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(value.obj)) 
+                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(value.obj))
             return value
         elif isinstance(value, basestring):
             #elif isinstance(value, tuple(self.uri_cls_list)):
@@ -753,14 +753,14 @@ class RelatedField(ApiField):
                 bundle = self.resource_from_uri(self.fk_resource, value['resource_uri'], **kwargs)
                 if orig_bundle:
                     #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
-                    orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj)) 
+                    orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj))
                 return bundle
         elif hasattr(value, 'pk'):
             # We've got an object with a primary key.
             bundle = self.resource_from_pk(self.fk_resource, value, **kwargs)
             if orig_bundle:
                 #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
-                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj)) 
+                orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj))
             return bundle
         else:
             raise ApiFieldError("The '%s' field was given data that was not a URI, not a dictionary-alike and does not have a 'pk' attribute: %s." % (self.instance_name, value))
@@ -981,7 +981,10 @@ class ToManyField(RelatedField):
 
         m2m_hydrated = []
 
-        for value in bundle.data.get(self.instance_name):
+        value_list = bundle.data.get(self.instance_name)
+        if not isinstance(value_list,list):
+            raise ApiFieldError("The '%s' field has to be list." % self.instance_name)
+        for value in value_list:
             if value is None:
                 continue
 
@@ -1035,7 +1038,7 @@ class ToManyField(RelatedField):
             )
             related_bundle = related_resource.save(updated_related_bundle)
             related_objs.append(related_bundle.obj)
-        return related_objs 
+        return related_objs
 
 
     def save(self, bundle):
@@ -1078,7 +1081,7 @@ class BaseSubResourceField(object):
         if bundle:
             related_resource.parent_resource = getattr(self, 'resource_obj')
             related_resource.parent_pk = bundle.obj.pk
-        
+
         return related_resource
 
 class ToOneSubResourceField(BaseSubResourceField, ToOneField):
