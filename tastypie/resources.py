@@ -62,7 +62,7 @@ class NOT_AVAILABLE:
     def __str__(self):
         return 'No such data is available.'
 
-class CustomRegexURLResolver(RegexURLResolver):    
+class CustomRegexURLResolver(RegexURLResolver):
     @property
     def url_patterns(self):
         url_patterns = patterns("", *self.urlconf_name)
@@ -112,9 +112,9 @@ class ResourceOptions(object):
     always_return_data = False
     collection_name = 'objects'
     detail_uri_name = 'pk'
-    create_on_related_fields = False 
+    create_on_related_fields = False
 
-    prefetch_related = [] 
+    prefetch_related = []
     select_related = []
 
     def __new__(cls, meta=None):
@@ -220,17 +220,17 @@ class Resource(object):
 
     def resource_parent_uri_kwargs(self, parent_resource, parent_pk):
         if not parent_resource:
-            return {}            
+            return {}
         else:
             kwargs = parent_resource.resource_parent_uri_kwargs(parent_resource.parent_resource,
                                                               parent_resource.parent_pk)
             kwargs.update({
                 '%s_resource_name'%parent_resource._meta.resource_name: parent_resource._meta.resource_name,
-                '%s_pk'%parent_resource._meta.resource_name: parent_pk    
-                
+                '%s_pk'%parent_resource._meta.resource_name: parent_pk
+
             })
             return kwargs
-            
+
     def wrap_view(self, view):
         """
         Wraps methods so they can be called in a more functional way as well
@@ -243,7 +243,7 @@ class Resource(object):
 
         @csrf_exempt
         def wrapper(request, *args, **kwargs):
-            
+
             try:
                 callback = getattr(self, view)
                 response = callback(request, *args, **kwargs)
@@ -276,7 +276,7 @@ class Resource(object):
                 return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
             except Exception, e:
                 return self._handle_500(request, e)
-                
+
 
         return wrapper
 
@@ -285,7 +285,7 @@ class Resource(object):
         return method(request, exception)
 
     def _handle_500_wsgirequest(self, request, exception):
-                
+
         if hasattr(exception, 'response'):
             return exception.response
 
@@ -299,11 +299,11 @@ class Resource(object):
         # happend during a test case
         if request.META.get('SERVER_NAME') == 'testserver':
             raise
-                
+
         # Rather than re-raising, we're going to things similar to
         # what Django does. The difference is returning a serialized
         # error message.
-                
+
         import traceback
         import sys
         the_trace = '\n'.join(traceback.format_exception(*(sys.exc_info())))
@@ -391,10 +391,10 @@ class Resource(object):
             parent_obj = self.obj_get(parent_bundle, **{'pk':pk})
         except Exception:
             return self._meta.response_router_obj[request].get_not_found_response()
-        
+
         for field in sub_resource_field_list:
             sub_resource_cls = field.to_class
-            sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self, 
+            sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self,
                     parent_pk=pk, parent_obj=parent_obj, parent_field=field.attribute)
             try:
                 manager = parent_obj
@@ -591,7 +591,7 @@ class Resource(object):
         # If what comes back isn't a ``HttpResponse``, assume that the
         # request was accepted and that some action occurred. This also
         # prevents Django from freaking out.
-        
+
         ##if not isinstance(response,  self._meta.response_router_obj[request].get_response_class())
         ##return  self._meta.response_router_obj[request].get_no_content_response()
 
@@ -652,7 +652,7 @@ class Resource(object):
             response['Allow'] = allows
             raise ImmediateResponse(response=response)
 
-        if not request_method in allowed:            
+        if not request_method in allowed:
             response =  self._meta.response_router_obj[request].get_method_notallowed_response(allows)
             response['Allow'] = allows
             raise ImmediateResponse(response=response)
@@ -683,7 +683,7 @@ class Resource(object):
         return method(request)
 
     def throttle_check_wsgirequest(self, request):
-        
+
         identifier = self._meta.authentication.get_identifier(request)
 
         # Check to see if they should be throttled.
@@ -700,7 +700,7 @@ class Resource(object):
         """
         method = getattr(self, '%s_%s' %(get_current_func_name(), get_request_class(request)))
         return method(request)
-        
+
     def log_throttled_access_wsgirequest(self, request):
         request_method = request.method.lower()
         self._meta.throttle.accessed(self._meta.authentication.get_identifier(request), url=request.get_full_path(), request_method=request_method)
@@ -829,7 +829,7 @@ class Resource(object):
 
     def preprocess(self, event_type, bundle):
         """
-        Handles pre processing. Event manager object implemented in a 
+        Handles pre processing. Event manager object implemented in a
         subclass can handle doing appropriate work
         """
         pre_processor = getattr(self._meta.bundle_pre_processor, event_type, None) if self._meta.bundle_pre_processor else None
@@ -841,7 +841,7 @@ class Resource(object):
 
     def fire_event(self, event_type, args=()):
         """
-        Handles generation of event. Event manager object implemented in a 
+        Handles generation of event. Event manager object implemented in a
         subclass can handle doing appropriate work
         """
         object_list, bundle = args
@@ -927,7 +927,7 @@ class Resource(object):
         If the ``bundle_or_obj`` argument is provided, it calls
         ``Resource.detail_uri_kwargs`` for additional bits to create
         """
-        
+
         kwargs = {
             'resource_name': self._meta.resource_name,
         }
@@ -957,18 +957,18 @@ class Resource(object):
             _format = self.determine_format(bundle_or_obj.request)
         ##strip the "application" in "application/{format}"
             _format = _format.split('/')[1]
-        
+
         ##WARNING: if a method is not provided for your type will pass to default<
             method = getattr(self, '%s_%s' % (get_current_func_name(), _format), self.get_resource_uri_default)
             return method(bundle_or_obj, **kwargs)
         else:
             return self.get_resource_uri_default(bundle_or_obj, **kwargs)
-            
+
 
     def get_resource_uri_default(self, bundle_or_obj, url_name='api_dispatch_list', **kwargs):
         if bundle_or_obj is not None:
             url_name = 'api_dispatch_detail'
-        
+
         try:
             return self._build_reverse_url(url_name, kwargs=self.resource_uri_kwargs(bundle_or_obj))
         except NoReverseMatch:
@@ -1042,7 +1042,7 @@ class Resource(object):
 
             if method:
                 bundle.data[field_name] = method(bundle)
-                
+
         bundle = self.dehydrate(bundle)
         return bundle
 
@@ -1445,7 +1445,7 @@ class Resource(object):
                 if isinstance(data, basestring):
                     #happens incase of a toonefield
                     data = {'resource_uri':data}
-                return related_resource.build_bundle(obj=None, data=data, 
+                return related_resource.build_bundle(obj=None, data=data,
                     request=bundle.request)
 
 
@@ -1782,6 +1782,31 @@ class Resource(object):
         if len(deserialized[collection_name]) and 'patch' not in self._meta.detail_allowed_methods:
             raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response('patch'))
 
+        deleted_collection = deserialized.get(deleted_collection_name, [])
+
+        if deleted_collection:
+            if 'delete' not in self._meta.detail_allowed_methods:
+                raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response('delete'))
+            to_be_deleted = []
+
+            for thing in deleted_collection:
+                try:
+                    if isinstance(thing, basestring):
+                        obj = self.get_via_uri(thing, request=request)
+                    elif isinstance(thing, dict) and 'resource_uri' in thing:
+                        uri = thing.pop('resource_uri')
+                        obj = self.get_via_uri(uri, request=request)
+                    else:
+                        raise ValueError("cannot resolve %s into a valid object for deletions" % thing)
+                    bundle = self.build_bundle(obj=obj, request=request)
+                    to_be_deleted.append(bundle)
+                except ObjectDoesNotExist:
+                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_response_notfound_class()("Couldn't find instace for uri: %s" % uri))
+                except MultipleObjectsReturned:
+                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_bad_request_response_class()("Couldn't find instace for uri: %s" % uri))
+            for del_bundle in to_be_deleted:
+                self.obj_delete(bundle=del_bundle)
+
         to_be_updated, to_be_created, bundles_seen = [], [], []
         for data in deserialized[collection_name]:
             # If there's a resource_uri then this is either an
@@ -1816,24 +1841,6 @@ class Resource(object):
         for up_agrs in to_be_updated:
             self.update_in_place(*up_agrs)
 
-        deleted_collection = deserialized.get(deleted_collection_name, [])
-
-        if deleted_collection:
-            if 'delete' not in self._meta.detail_allowed_methods:
-                raise ImmediateResponse(response= self._meta.response_router_obj[request].get_method_notallowed_response('delete'))
-            to_be_deleted = []
-
-            for uri in deleted_collection:
-                try:
-                    obj = self.get_via_uri(uri, request=request)
-                    bundle = self.build_bundle(obj=obj, request=request)
-                    to_be_deleted.append(bundle)
-                except ObjectDoesNotExist:
-                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_response_notfound_class()("Couldn't find instace for uri: %s" % uri))
-                except MultipleObjectsReturned:
-                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_bad_request_response_class()("Couldn't find instace for uri: %s" % uri))
-            for del_bundle in to_be_deleted:
-                self.obj_delete(bundle=del_bundle)
         self.fire_event('list_updated', args=(self.get_object_list(request), self.build_bundle(request=request)))
         response_class = self._meta.response_router_obj[request].get_accepted_response_class()
         if not self._meta.always_return_data:
@@ -1924,7 +1931,7 @@ class Resource(object):
         """
         self.method_check(request, allowed=['get'])
         self.is_authenticated(request)
-        self.throttle_check(request)                 
+        self.throttle_check(request)
         self.log_throttled_access(request)
         bundle = self.build_bundle(request=request)
         #Cant imagine why schema has to be validated!
@@ -2352,7 +2359,7 @@ class ModelResource(Resource):
             else:
                 if field_use_in not in use_in:
                     continue
-            
+
             if field_object.instance_name in self._meta.prefetch_related + self._meta.select_related:
                 if field_object.instance_name in self._meta.prefetch_related:
                     for attr in field_attr_to_related_attr_converter(field_object.attribute):
@@ -2704,7 +2711,7 @@ class ModelResource(Resource):
             if field_object.readonly:
                 continue
             field_object.save(bundle)
-    
+
             '''
             # Get the manager.
             related_mngr = None
