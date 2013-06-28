@@ -1801,9 +1801,9 @@ class Resource(object):
                     bundle = self.build_bundle(obj=obj, request=request)
                     to_be_deleted.append(bundle)
                 except ObjectDoesNotExist:
-                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_response_notfound_class()("Couldn't find instace for uri: %s" % uri))
+                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_response_notfound_class()("Couldn't find instace for data: %s" % thing))
                 except MultipleObjectsReturned:
-                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_bad_request_response_class()("Couldn't find instace for uri: %s" % uri))
+                    raise ImmediateResponse(response=self._meta.response_router_obj[request].get_bad_request_response_class()("Couldn't find instace for data: %s" % thing))
             for del_bundle in to_be_deleted:
                 self.obj_delete(bundle=del_bundle)
 
