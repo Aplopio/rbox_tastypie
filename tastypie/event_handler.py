@@ -58,6 +58,8 @@ class EventHandler(object):
     def detail_deleted(self, object_list, bundle):
         pass
 
+    def pre_detail_deleted(self, object_list, bundle):
+        pass
 
 
 class MultiEventHandler(EventHandler):
@@ -113,6 +115,9 @@ class MultiEventHandler(EventHandler):
     def delete_detail_handlers(self):
         return self.get_event_handlers()
 
+    def pre_delete_detail_handlers(self):
+        return self.get_event_handlers()
+
     def list_read(self, object_list, bundle):
         for event_handler in self.read_list_handlers():
             event_handler.list_read(object_list, bundle)
@@ -144,3 +149,7 @@ class MultiEventHandler(EventHandler):
     def detail_deleted(self, object_list, bundle):
         for ev in self.delete_detail_handlers():
             ev.detail_deleted(object_list, bundle)
+
+    def pre_detail_deleted(self, object_list, bundle):
+        for ev in self.pre_delete_detail_handlers():
+            ev.pre_detail_deleted(object_list, bundle)

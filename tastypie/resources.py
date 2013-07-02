@@ -2571,6 +2571,7 @@ class ModelResource(Resource):
 
         self.authorized_delete_detail(self.get_object_list(bundle.request), bundle)
         bundle = self.preprocess('delete_detail', bundle)
+        self.fire_event('pre_detail_deleted', args=(self.get_object_list(bundle.request), bundle))
         bundle.obj.delete()
         self.fire_event('detail_deleted', args=(self.get_object_list(bundle.request), bundle))
 
