@@ -44,7 +44,8 @@ class ApiField(object):
     dehydrated_type = 'string'
     help_text = ''
 
-    def __init__(self, attribute=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, unique=False, help_text=None, use_in='all'):
+    def __init__(self, attribute=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, 
+            unique=False, help_text=None, use_in='all', change_handler=None):
         """
         Sets up the field. This is generally called when the containing
         ``Resource`` is initialized.
@@ -93,6 +94,7 @@ class ApiField(object):
         self.value = None
         self.unique = unique
         self.use_in = 'all'
+        self.change_handler = change_handler
 
         if use_in in ['all', 'detail', 'list'] or callable(use_in):
             self.use_in = use_in
@@ -463,7 +465,7 @@ class RelatedField(ApiField):
         else:
             return AllowEverythingChoiceField
 
-    def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, full=False, unique=False, help_text=None, use_in='all', full_list=True, full_detail=True):
+    def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, full=False, unique=False, help_text=None, use_in='all', full_list=True, full_detail=True, change_handler=None):
         """
         Builds the field and prepares it to access to related data.
 
@@ -536,6 +538,7 @@ class RelatedField(ApiField):
         self.use_in = 'all'
         self.full_list = full_list
         self.full_detail = full_detail
+        self.change_handler = change_handler
 
         if use_in in ['all', 'detail', 'list'] or callable(use_in):
             self.use_in = use_in
@@ -793,12 +796,13 @@ class ToOneField(RelatedField):
 
     def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED,
                  null=False, blank=False, readonly=False, full=False,
-                 unique=False, help_text=None, use_in='all', full_list=True, full_detail=True):
+                 unique=False, help_text=None, use_in='all', full_list=True, 
+                 full_detail=True, change_handler=None):
         super(ToOneField, self).__init__(
             to, attribute, related_name=related_name, default=default,
             null=null, blank=blank, readonly=readonly, full=full,
             unique=unique, help_text=help_text, use_in=use_in,
-            full_list=full_list, full_detail=full_detail
+            full_list=full_list, full_detail=full_detail, change_handler=change_handler
         )
         self.fk_resource = None
 
@@ -909,12 +913,14 @@ class ToManyField(RelatedField):
 
     def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED,
                  null=False, blank=False, readonly=False, full=False,
-                 unique=False, help_text=None, use_in='all', full_list=True, full_detail=True):
+                 unique=False, help_text=None, use_in='all', full_list=True, 
+                 full_detail=True, change_handler=None):
         super(ToManyField, self).__init__(
             to, attribute, related_name=related_name, default=default,
             null=null, blank=blank, readonly=readonly, full=full,
             unique=unique, help_text=help_text, use_in=use_in,
-            full_list=full_list, full_detail=full_detail
+            full_list=full_list, full_detail=full_detail, 
+            change_handler=change_handler
         )
         self.m2m_bundles = []
 

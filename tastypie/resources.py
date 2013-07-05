@@ -1907,6 +1907,7 @@ class Resource(object):
                     except AttributeError:
                         pass
 
+        original_bundle.original_data = original_bundle.data.copy()
         original_bundle.data.update(**dict_strip_unicode_keys(new_data))
         original_bundle.new_data = new_data
 
@@ -2599,6 +2600,19 @@ class ModelResource(Resource):
     def create_identifier(self, obj):
         return u"%s.%s.%s" % (obj._meta.app_label, obj._meta.module_name, obj.pk)
 
+    def trigger_field_changes(self, bundle):
+        '''
+        Triggers change events on fields that are listening
+        '''
+        for field_name, field_object in self.fields.items():
+            if field_object.readonly:
+                continue
+           
+            if bundle.data[field_name] != bundle.original_data[field_name] and field_object.change_handler:
+                field_object.change_handler(new_value = bundle.data[field_name], 
+                        original_value = bundle.original_data[field_name])
+
+
     def save(self, bundle, skip_errors=False):
         self.is_valid(bundle)
 
@@ -2608,8 +2622,10 @@ class ModelResource(Resource):
         # Check if they're authorized.
         if bundle.obj.pk:
             self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
+            obj_update = True
         else:
             self.authorized_create_detail(self.get_object_list(bundle.request), bundle)
+            obj_update = False
 
         # Save FKs just in case.
         self.save_related(bundle)
@@ -2621,6 +2637,9 @@ class ModelResource(Resource):
         # Now pick up the M2M bits.
         m2m_bundle = self.hydrate_m2m(bundle)
         self.save_m2m(m2m_bundle)
+
+        if obj_update and hasattr(bundle, 'original_data'):
+            self.trigger_field_changes(bundle)
         return bundle
 
     def save_related(self, bundle):
