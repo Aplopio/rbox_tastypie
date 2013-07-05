@@ -1100,7 +1100,8 @@ class Resource(object):
                             continue
                         elif field_object.null:
                             setattr(bundle.obj, field_object.attribute, value)
-
+        
+        bundle = self.hydrate_m2m(bundle)
         return bundle
 
     def hydrate(self, bundle):
@@ -1131,7 +1132,9 @@ class Resource(object):
                 # unmodified. It's up to the user's code to handle this.
                 # The ``ModelResource`` provides a working baseline
                 # in this regard.
-                bundle.data[field_name] = field_object.hydrate_m2m(bundle)
+                value = field_object.hydrate_m2m(bundle)
+                if not (value is None and field_object.readonly):
+                    bundle.data[field_name] = value
 
         for field_name, field_object in self.fields.items():
             if not getattr(field_object, 'is_m2m', False):
@@ -1862,7 +1865,6 @@ class Resource(object):
         """
         request = convert_post_to_patch(request)
         basic_bundle = self.build_bundle(request=request)
-
         # We want to be able to validate the update, but we can't just pass
         # the partial data into the validator since all data needs to be
         # present. Instead, we basically simulate a PUT by pulling out the
@@ -2635,8 +2637,8 @@ class ModelResource(Resource):
         bundle.objects_saved.add(self.create_identifier(bundle.obj))
 
         # Now pick up the M2M bits.
-        m2m_bundle = self.hydrate_m2m(bundle)
-        self.save_m2m(m2m_bundle)
+        # RK: M2M hydrate already done in hydrate.
+        self.save_m2m(bundle)
 
         if obj_update and hasattr(bundle, 'original_data'):
             self.trigger_field_changes(bundle)
