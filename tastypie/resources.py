@@ -2607,10 +2607,10 @@ class ModelResource(Resource):
         for field_name, field_object in self.fields.items():
             if field_object.readonly:
                 continue
-           
+
             if bundle.data[field_name] != bundle.original_data[field_name] and field_object.change_handler:
-                field_object.change_handler(new_value = bundle.data[field_name], 
-                        original_value = bundle.original_data[field_name])
+                field_object.change_handler(bundle=bundle, new_value = bundle.data[field_name],
+                                            original_value = bundle.original_data[field_name])
 
 
     def save(self, bundle, skip_errors=False):
