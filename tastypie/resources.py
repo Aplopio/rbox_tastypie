@@ -706,126 +706,71 @@ class Resource(object):
         self._meta.throttle.accessed(self._meta.authentication.get_identifier(request), url=request.get_full_path(), request_method=request_method)
 
 
-
-    def unauthorized_result(self, request, exception):
-        raise ImmediateResponse(response=self._meta.response_router_obj[request].get_unauthorized_request_response())
-
-    def forbidden_result(self, request, exception):
-        response_class = self._meta.response_router_obj[request].get_forbidden_response_class()
-        errors = {"error_type":exception.error_type,
-                 "error_message":exception.error_message}
-        response=self.error_response(request, errors, response_class=response_class)
-        raise ImmediateResponse(response)
+    def is_authorized(self, action,object_list, bundle ):
+        try:
+            auth_result = getattr(self._meta.authorization, action)(object_list, bundle)
+        except Unauthorized, exception:
+            
+            raise ImmediateResponse(response=self._meta.response_router_obj[bundle.request].get_unauthorized_request_response())
+            
+            #self.unauthorized_result(bundle.request, e)
+        except Forbidden, exception:
+            
+            response_class = self._meta.response_router_obj[bundle.request].get_forbidden_response_class()
+            errors = {"error_type":exception.error_type,
+                     "error_message":exception.error_message}
+            response=self.error_response(bundle.request, errors, response_class=response_class)
+            raise ImmediateResponse(response)
+            #self.forbidden_result(bundle.request,e)
+        return auth_result
 
     def authorized_read_list(self, object_list, bundle):
         """
-        Handles checking of permissions to see if the user has authorization
-        to GET this resource.
+        DEPRECATED
         """
-        try:
-            auth_result = self._meta.authorization.read_list(object_list, bundle)
-        except Unauthorized, e:
-            self.unauthorized_result(bundle.request, e)
-        except Forbidden, e:
-            self.forbidden_result(bundle.request, e)
-
-        return auth_result
+        return self.is_authorized("read_list", object_list, bundle)
 
     def authorized_read_detail(self, object_list, bundle):
         """
-        Handles checking of permissions to see if the user has authorization
-        to GET this resource.
+        DEPRECATED
         """
-        try:
-            auth_result = self._meta.authorization.read_detail(object_list, bundle)
-        except Unauthorized, e:
-            self.unauthorized_result(bundle.request, e)
-        except Forbidden, e:
-            self.forbidden_result(bundle.request,e)
-        return auth_result
+        return self.is_authorized("read_detail", object_list, bundle)
 
     def authorized_create_list(self, object_list, bundle):
         """
-        Handles checking of permissions to see if the user has authorization
-        to POST this resource.
+        DEPRECATED
         """
-        try:
-            auth_result = self._meta.authorization.create_list(object_list, bundle)
-        except Unauthorized, e:
-            self.unauthorized_result(bundle.request,e)
-        except Forbidden, e:
-            self.forbidden_result(bundle.request,e)
-
-        return auth_result
+        return self.is_authorized("create_detail", object_list, bundle)
 
     def authorized_create_detail(self, object_list, bundle):
         """
-        Handles checking of permissions to see if the user has authorization
-        to POST this resource.
+        DEPRECATED
         """
-        try:
-            auth_result = self._meta.authorization.create_detail(object_list, bundle)
-        except Unauthorized, e:
-            self.unauthorized_result(bundle.request,e)
-        except Forbidden, e:
-            self.forbidden_result(bundle.request,e)
-        return auth_result
+        return self.is_authorized("create_detail", object_list, bundle)
 
     def authorized_update_list(self, object_list, bundle):
         """
-        Handles checking of permissions to see if the user has authorization
-        to PUT this resource.
+        DEPRECATED
         """
-        try:
-            auth_result = self._meta.authorization.update_list(object_list, bundle)
-        except Unauthorized, e:
-            self.unauthorized_result(bundle.request,e)
-        except Forbidden, e:
-            self.forbidden_result(bundle.request,e)
-
-        return auth_result
+        return self.is_authorized("update_list", object_list, bundle)
 
     def authorized_update_detail(self, object_list, bundle):
         """
-        Handles checking of permissions to see if the user has authorization
-        to PUT this resource.
+        DEPRECATED
         """
-        try:
-            auth_result = self._meta.authorization.update_detail(object_list, bundle)
-        except Unauthorized, e:
-            self.unauthorized_result(bundle.request,e)
-        except Forbidden, e:
-            self.forbidden_result(bundle.request,e)
-
-        return auth_result
+        return self.is_authorized("update_detail", object_list, bundle)
 
     def authorized_delete_list(self, object_list, bundle):
         """
-        Handles checking of permissions to see if the user has authorization
-        to DELETE this resource.
+        DEPRECATED
         """
-        try:
-            auth_result = self._meta.authorization.delete_list(object_list, bundle)
-        except Unauthorized, e:
-            self.unauthorized_result(bundle.request,e)
-        except Forbidden, e:
-            self.forbidden_result(bundle.request,e)
-
-        return auth_result
+        return self.is_authorized("delete_list", object_list, bundle)
 
     def authorized_delete_detail(self, object_list, bundle):
         """
-        Handles checking of permissions to see if the user has authorization
-        to DELETE this resource.
+        DEPRECATED
         """
-        try:
-            auth_result = self._meta.authorization.delete_detail(object_list, bundle)
-        except Unauthorized, e:
-            self.unauthorized_result(bundle.request,e)
-        except Forbidden, e:
-            self.forbidden_result(bundle.request,e)
-
-        return auth_result
+        return self.is_authorized("delete_detail", object_list, bundle)
 
     def preprocess(self, event_type, bundle):
         """
@@ -2419,7 +2364,7 @@ class ModelResource(Resource):
         try:
             objects = self.apply_filters(bundle.request, applicable_filters, exclude_filters)
             objects = self.optimize_query(objects, bundle, for_list=True)
-            return self.authorized_read_list(objects, bundle)
+            return self.is_authorized("read_list", objects, bundle)
         except ValueError:
             raise BadRequest("Invalid resource lookup data provided (mismatched type).")
 
@@ -2443,7 +2388,7 @@ class ModelResource(Resource):
                 raise MultipleObjectsReturned("More than '%s' matched '%s'." % (self._meta.object_class.__name__, stringified_kwargs))
 
             bundle.obj = object_list[0]
-            self.authorized_read_detail(object_list, bundle)
+            self.is_authorized("read_detail", object_list, bundle)
             return bundle.obj
         except ValueError:
             raise NotFound("Invalid resource lookup data provided (mismatched type).")
@@ -2457,7 +2402,7 @@ class ModelResource(Resource):
         for key, value in kwargs.items():
             setattr(bundle.obj, key, value)
 
-        self.authorized_create_detail(self.get_object_list(bundle.request), bundle)
+        self.is_authorized("create_detail", self.get_object_list(bundle.request), bundle)
         bundle = self.preprocess('create_detail', bundle)
         bundle = self.full_hydrate(bundle)
         bundle = self.save(bundle)
@@ -2550,7 +2495,8 @@ class ModelResource(Resource):
         A ORM-specific implementation of ``obj_delete_list_for_update``.
         """
         objects_to_delete = self.obj_get_list(bundle=bundle, **kwargs)
-        deletable_objects = self.authorized_update_list(objects_to_delete, bundle)
+
+        deleteable_objects = self.is_authorized("update_list", objects_to_delete, bundle)
         bundle = self.preprocess('update_list', bundle)
         if hasattr(deletable_objects, 'delete'):
             # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
@@ -2626,7 +2572,7 @@ class ModelResource(Resource):
             self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
             obj_update = True
         else:
-            self.authorized_create_detail(self.get_object_list(bundle.request), bundle)
+            self.is_authorized("create_detail", self.get_object_list(bundle.request), bundle)
             obj_update = False
 
         # Save FKs just in case.
