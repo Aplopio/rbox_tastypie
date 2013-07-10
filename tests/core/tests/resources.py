@@ -64,8 +64,8 @@ class BasicResourceWithDifferentListAndDetailFields(Resource):
 
 class BasicResourceWithDifferentListAndDetailFieldsCallable(Resource):
     name = fields.CharField(attribute='name', use_in="all")
-    view_count = fields.IntegerField(attribute='view_count', default=0, use_in=lambda x: True)
-    date_joined = fields.DateTimeField(null=True, use_in=lambda x: False)
+    view_count = fields.IntegerField(attribute='view_count', default=0, use_in=lambda x,y: True)
+    date_joined = fields.DateTimeField(null=True, use_in=lambda x,y: False)
 
     class Meta:
         object_class = TestObject
