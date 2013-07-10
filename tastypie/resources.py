@@ -2496,7 +2496,7 @@ class ModelResource(Resource):
         """
         objects_to_delete = self.obj_get_list(bundle=bundle, **kwargs)
 
-        deleteable_objects = self.is_authorized("update_list", objects_to_delete, bundle)
+        deletable_objects = self.is_authorized("update_list", objects_to_delete, bundle)
         bundle = self.preprocess('update_list', bundle)
         if hasattr(deletable_objects, 'delete'):
             # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
