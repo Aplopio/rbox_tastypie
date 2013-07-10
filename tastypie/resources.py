@@ -710,12 +710,12 @@ class Resource(object):
         try:
             auth_result = getattr(self._meta.authorization, action)(object_list, bundle)
         except Unauthorized, exception:
-            
+
             raise ImmediateResponse(response=self._meta.response_router_obj[bundle.request].get_unauthorized_request_response())
-            
+
             #self.unauthorized_result(bundle.request, e)
         except Forbidden, exception:
-            
+
             response_class = self._meta.response_router_obj[bundle.request].get_forbidden_response_class()
             errors = {"error_type":exception.error_type,
                      "error_message":exception.error_message}
@@ -1045,7 +1045,7 @@ class Resource(object):
                             continue
                         elif field_object.null:
                             setattr(bundle.obj, field_object.attribute, value)
-        
+
         bundle = self.hydrate_m2m(bundle)
         return bundle
 
