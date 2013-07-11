@@ -2557,8 +2557,8 @@ class ModelResource(Resource):
                 continue
 
             if bundle.data[field_name] != bundle.original_data[field_name] and field_object.change_handler:
-                field_object.change_handler(bundle=bundle, new_value = bundle.data[field_name],
-                                            original_value = bundle.original_data[field_name])
+                field_object.change_handler(bundle, bundle.data[field_name],
+                                            bundle.original_data[field_name])
 
 
     def save(self, bundle, skip_errors=False):
