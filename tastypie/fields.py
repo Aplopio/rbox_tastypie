@@ -3,6 +3,7 @@ from dateutil.parser import parse
 from decimal import Decimal
 import re
 from django import forms
+from django.utils.functional import memoize
 
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django import forms as djangoform
@@ -10,7 +11,11 @@ from django.utils import datetime_safe, importlib
 from django.core.urlresolvers import resolve
 from tastypie.bundle import Bundle
 from tastypie.exceptions import ApiFieldError, NotFound, HydrationError
-from tastypie.utils import dict_strip_unicode_keys, make_aware
+from tastypie.utils import dict_strip_unicode_keys, make_aware, LimitedSizeDict
+
+resolver_cache = LimitedSizeDict(size_limit=200)
+
+resolve = memoize(resolve, resolver_cache, 2)
 
 
 class NOT_PROVIDED:

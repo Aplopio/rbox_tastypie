@@ -32,6 +32,7 @@ from tastypie import response_router_obj
 from django.core.exceptions import ImproperlyConfigured
 from django.core.urlresolvers import RegexURLResolver
 
+from copy import copy
 
 
 try:
@@ -205,7 +206,7 @@ class Resource(object):
     __metaclass__ = DeclarativeMetaclass
 
     def __init__(self, api_name=None, parent_resource=None, parent_pk=None, parent_obj=None, parent_field=None):
-        self.fields = deepcopy(self.base_fields)
+        self.fields = {k: copy(v) for k, v in self.base_fields.iteritems()}
         self.parent_resource=parent_resource
         self.parent_pk = parent_pk
         self.parent_obj = parent_obj
