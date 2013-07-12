@@ -281,7 +281,7 @@ class Resource(object):
         return wrapper
 
     def _handle_500(self, request, exception):
-        method = getattr(self, '%s_%s' % (get_current_func_name(), get_request_class(request)))
+        method = getattr(self, '%s_%s' % ('_handle_500', get_request_class(request)))
         return method(request, exception)
 
     def _handle_500_wsgirequest(self, request, exception):
@@ -679,7 +679,7 @@ class Resource(object):
         Mostly a hook, this uses class assigned to ``throttle`` from
         ``Resource._meta``.
         """
-        method = getattr(self, '%s_%s' %(get_current_func_name(), get_request_class(request)))
+        method = getattr(self, '%s_%s' %('throttle_check', get_request_class(request)))
         return method(request)
 
     def throttle_check_wsgirequest(self, request):
@@ -698,13 +698,18 @@ class Resource(object):
         Mostly a hook, this uses class assigned to ``throttle`` from
         ``Resource._meta``.
         """
-        method = getattr(self, '%s_%s' %(get_current_func_name(), get_request_class(request)))
+        method = getattr(self, '%s_%s' %('log_throttled_access', get_request_class(request)))
         return method(request)
 
     def log_throttled_access_wsgirequest(self, request):
         request_method = request.method.lower()
         self._meta.throttle.accessed(self._meta.authentication.get_identifier(request), url=request.get_full_path(), request_method=request_method)
 
+    def get_paginator(self, bundle, object_list):
+        request = bundle.request
+        paginator = self._meta.paginator_class(request.GET, object_list, resource_uri=self.get_resource_uri(), 
+                limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
+        return paginator
 
     def is_authorized(self, action,object_list, bundle ):
         try:
@@ -904,7 +909,7 @@ class Resource(object):
             _format = _format.split('/')[1]
 
         ##WARNING: if a method is not provided for your type will pass to default<
-            method = getattr(self, '%s_%s' % (get_current_func_name(), _format), self.get_resource_uri_default)
+            method = getattr(self, '%s_%s' % ('get_resource_uri', _format), self.get_resource_uri_default)
             return method(bundle_or_obj, **kwargs)
         else:
             return self.get_resource_uri_default(bundle_or_obj, **kwargs)
@@ -929,7 +934,7 @@ class Resource(object):
         If you need custom behavior based on other portions of the URI,
         simply override this method.
         """
-        method = getattr(self, '%s_%s' % (get_current_func_name(), get_request_class(request)))
+        method = getattr(self, '%s_%s' % ('get_via_uri', get_request_class(request)))
         return method(uri, request)
 
 
@@ -1467,7 +1472,7 @@ class Resource(object):
         objects = self.obj_get_list(bundle=base_bundle, **self.remove_api_resource_names(kwargs))
         sorted_objects = self.apply_sorting(objects, options=request.GET)
 
-        paginator = self._meta.paginator_class(request.GET, sorted_objects, resource_uri=self.get_resource_uri(), limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
+        paginator = self.get_paginator(base_bundle, sorted_objects)
         to_be_serialized = paginator.page()
 
         base_bundle = self.preprocess('read_list', base_bundle)
