@@ -16,7 +16,7 @@ from django.utils import simplejson as json
 from tastypie.authentication import BasicAuthentication
 from tastypie.authorization import Authorization
 from tastypie.bundle import Bundle
-from tastypie.exceptions import InvalidFilterError, InvalidSortError, ImmediateHttpResponse, BadRequest, NotFound
+from tastypie.exceptions import InvalidFilterError, InvalidSortError, ImmediateResponse, BadRequest, NotFound
 from tastypie import fields
 from tastypie.paginator import Paginator
 from tastypie.resources import Resource, ModelResource, ALL, ALL_WITH_RELATIONS, convert_post_to_put, convert_post_to_patch
@@ -64,8 +64,8 @@ class BasicResourceWithDifferentListAndDetailFields(Resource):
 
 class BasicResourceWithDifferentListAndDetailFieldsCallable(Resource):
     name = fields.CharField(attribute='name', use_in="all")
-    view_count = fields.IntegerField(attribute='view_count', default=0, use_in=lambda x: True)
-    date_joined = fields.DateTimeField(null=True, use_in=lambda x: False)
+    view_count = fields.IntegerField(attribute='view_count', default=0, use_in=lambda x,y: True)
+    date_joined = fields.DateTimeField(null=True, use_in=lambda x,y: False)
 
     class Meta:
         object_class = TestObject
@@ -680,21 +680,21 @@ class ResourceTestCase(TestCase):
         request.GET = {'format': 'json'}
 
         # No allowed methods. Kaboom.
-        self.assertRaises(ImmediateHttpResponse, basic.method_check, request)
+        self.assertRaises(ImmediateResponse, basic.method_check, request)
 
         try:
             basic.method_check(request)
             self.fail("Should have thrown an exception.")
-        except ImmediateHttpResponse, e:
+        except ImmediateResponse, e:
             self.assertEqual(e.response['Allow'], '')
 
         # Not an allowed request.
-        self.assertRaises(ImmediateHttpResponse, basic.method_check, request, allowed=['post'])
+        self.assertRaises(ImmediateResponse, basic.method_check, request, allowed=['post'])
 
         try:
             basic.method_check(request, allowed=['post'])
             self.fail("Should have thrown an exception.")
-        except ImmediateHttpResponse, e:
+        except ImmediateResponse, e:
             self.assertEqual(e.response['Allow'], 'POST')
 
         # Allowed (single).
@@ -710,12 +710,12 @@ class ResourceTestCase(TestCase):
         request.POST = {'format': 'json'}
 
         # Not an allowed request.
-        self.assertRaises(ImmediateHttpResponse, basic.method_check, request, allowed=['get'])
+        self.assertRaises(ImmediateResponse, basic.method_check, request, allowed=['get'])
 
         try:
             basic.method_check(request, allowed=['get', 'put', 'delete', 'patch'])
             self.fail("Should have thrown an exception.")
-        except ImmediateHttpResponse, e:
+        except ImmediateResponse, e:
             self.assertEqual(e.response['Allow'], 'GET,PUT,DELETE,PATCH')
 
         # Allowed (multiple).
@@ -2117,7 +2117,7 @@ class ModelResourceTestCase(TestCase):
         request.GET = {'format': 'json'}
         request.method = 'PATCH'
         request._read_started = False
-        
+
         self.assertEqual(Note.objects.count(), 6)
         request._raw_post_data = request._body = '{"objects": [{"content": "The cat is back. The dog coughed him up out back.", "created": "2010-04-03 20:05:00", "is_active": true, "slug": "cat-is-back-again", "title": "The Cat Is Back", "updated": "2010-04-03 20:05:00"}, {"resource_uri": "/api/v1/notes/2/", "content": "This is note 2."}], "deleted_objects": ["/api/v1/notes/1/"]}'
 
@@ -2569,7 +2569,7 @@ class ModelResourceTestCase(TestCase):
         try:
             resp = resource.dispatch('list', request)
             self.fail()
-        except ImmediateHttpResponse, e:
+        except ImmediateResponse, e:
             self.assertEqual(e.response.status_code, 429)
             self.assertEqual(len(cache.get('noaddr_nohost_accesses')), 2)
 
@@ -2577,7 +2577,7 @@ class ModelResourceTestCase(TestCase):
         try:
             resp = resource.dispatch('list', request)
             self.fail()
-        except ImmediateHttpResponse, e:
+        except ImmediateResponse, e:
             self.assertEqual(e.response.status_code, 429)
             self.assertEqual(len(cache.get('noaddr_nohost_accesses')), 2)
 
@@ -2659,15 +2659,15 @@ class ModelResourceTestCase(TestCase):
 
     def test_obj_delete_list_filtered(self):
         self.assertEqual(Note.objects.all().count(), 6)
-        
+
         note_to_delete = Note.objects.filter(is_active=True)[0]
-        
+
         request = HttpRequest()
         request.method = 'DELETE'
         request.GET = {'slug':str(note_to_delete.slug)}
         NoteResource().delete_list(request=request)
         self.assertEqual(len(Note.objects.all()), 5)
-        
+
     def test_obj_create(self):
         self.assertEqual(Note.objects.all().count(), 6)
         note = NoteResource()
@@ -3363,7 +3363,7 @@ class BasicAuthResourceTestCase(TestCase):
         try:
             resp = resource.dispatch_list(request)
             self.fail()
-        except ImmediateHttpResponse, e:
+        except ImmediateResponse, e:
             self.assertEqual(e.response.status_code, 401)
 
         # Try again with ``wrap_view`` for sanity.
@@ -3387,7 +3387,7 @@ class BasicAuthResourceTestCase(TestCase):
         try:
             resp = resource.dispatch_detail(request, pk=1)
             self.fail()
-        except ImmediateHttpResponse, e:
+        except ImmediateResponse, e:
             self.assertEqual(e.response.status_code, 401)
 
         # Try again with ``wrap_view`` for sanity.

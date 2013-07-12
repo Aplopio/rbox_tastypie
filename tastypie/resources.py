@@ -715,12 +715,12 @@ class Resource(object):
         try:
             auth_result = getattr(self._meta.authorization, action)(object_list, bundle)
         except Unauthorized, exception:
-            
+
             raise ImmediateResponse(response=self._meta.response_router_obj[bundle.request].get_unauthorized_request_response())
-            
+
             #self.unauthorized_result(bundle.request, e)
         except Forbidden, exception:
-            
+
             response_class = self._meta.response_router_obj[bundle.request].get_forbidden_response_class()
             errors = {"error_type":exception.error_type,
                      "error_message":exception.error_message}
@@ -1050,7 +1050,7 @@ class Resource(object):
                             continue
                         elif field_object.null:
                             setattr(bundle.obj, field_object.attribute, value)
-        
+
         bundle = self.hydrate_m2m(bundle)
         return bundle
 
@@ -2501,7 +2501,7 @@ class ModelResource(Resource):
         """
         objects_to_delete = self.obj_get_list(bundle=bundle, **kwargs)
 
-        deleteable_objects = self.is_authorized("update_list", objects_to_delete, bundle)
+        deletable_objects = self.is_authorized("update_list", objects_to_delete, bundle)
         bundle = self.preprocess('update_list', bundle)
         if hasattr(deletable_objects, 'delete'):
             # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
@@ -2562,8 +2562,8 @@ class ModelResource(Resource):
                 continue
 
             if bundle.data[field_name] != bundle.original_data[field_name] and field_object.change_handler:
-                field_object.change_handler(bundle=bundle, new_value = bundle.data[field_name],
-                                            original_value = bundle.original_data[field_name])
+                field_object.change_handler(bundle, bundle.data[field_name],
+                                            bundle.original_data[field_name])
 
 
     def save(self, bundle, skip_errors=False):
