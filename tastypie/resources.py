@@ -5,7 +5,7 @@ import warnings
 import django
 from django.conf import settings
 from django.conf.urls.defaults import patterns, url, include
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured
 from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
 from django.db import transaction
 from django.db.models.sql.constants import QUERY_TERMS
@@ -33,6 +33,10 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.urlresolvers import RegexURLResolver
 
 from copy import copy
+
+from bson import ObjectId
+from pymongo import MongoClient
+from tastypie.bundle import Bundle
 
 
 try:
@@ -708,7 +712,7 @@ class Resource(object):
 
     def get_paginator(self, bundle, object_list):
         request = bundle.request
-        paginator = self._meta.paginator_class(request.GET, object_list, resource_uri=self.get_resource_uri(), 
+        paginator = self._meta.paginator_class(request.GET, object_list, resource_uri=self.get_resource_uri(),
                 limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
         return paginator
 
@@ -2787,3 +2791,119 @@ def convert_post_to_put(request):
 
 def convert_post_to_patch(request):
     return convert_post_to_VERB(request, verb='PATCH')
+
+
+##
+#Base Resource for mongo-db
+##
+
+db = MongoClient(
+    host=getattr(settings, "MONGODB_HOST", None),
+    port=getattr(settings, "MONGODB_PORT", None),
+    )[settings.MONGODB_LOG_DB_NAME]
+
+
+class Document(dict):
+    # dictionary-like object for mongodb documents.
+    __getattr__ = dict.get
+
+class MongoDBResource(Resource):
+    """
+    Base Resource for mongodb.
+    NOTE: alter it f using obj_create and
+    """
+
+    class Meta:
+        pass
+
+    def get_collection(self):
+        """
+        Encapsulates collection name.
+        """
+
+        try:
+            return db[self._meta.collection]
+        except AttributeError:
+            raise ImproperlyConfigured("Define a collection in your resource.")
+
+    def get_object_list(self, bundle=None, request=None, **kwargs):
+        """
+        Maps mongodb documents to Document class.
+        """
+        raise NotImplementedError("Dude write the function in each resource!")
+
+    def obj_get_list(self,bundle, **kwargs):
+        """
+        Maps mongodb documents to Document class.
+        """
+        self.is_authenticated(bundle.request)
+        filters = {}
+
+        if hasattr(bundle.request, 'GET'):
+            filters = dict(bundle.request.GET.copy().iteritems())
+        # Update with the provided kwargs.
+        if "format" in filters:
+            del filters['format']
+        return self.is_authorized("read_list", self.get_object_list(bundle=bundle,filters=filters,**kwargs), bundle)
+
+    def obj_get(self,bundle=None, request=None, **kwargs):
+        """
+        Returns mongodb document from provided id.
+        """
+        self.is_authenticated(bundle.request)
+        obj = Document(self.get_collection().find_one({
+            "_id": ObjectId(kwargs.get("pk"))
+        }))
+        self.is_authorized("read_detail", obj, bundle)
+        return obj
+
+    def obj_create(self, bundle, **kwargs):
+        """
+        Creates mongodb document from POST data.
+        """
+
+        self.is_authorized("create_detail", self.get_object_list(request=bundle.request), bundle)
+        self.get_collection().insert(bundle.data)
+        return bundle
+
+    def obj_update(self, bundle, request=None, **kwargs):
+        """
+        Updates mongodb document.
+        """
+        self.is_authorized("update_detail",self.get_object_list(request=bundle.request), bundle)
+        self.get_collection().update({
+            "_id": ObjectId(kwargs.get("pk"))
+        }, {
+            "$set": bundle.data
+        })
+        return bundle
+
+    def obj_delete(self, request=None, **kwargs):
+        """
+        Removes single document from collection
+        """
+        self.is_authorized("delete_detail",self.get_object_list(request=bundle.request), bundle)
+        self.get_collection().remove({ "_id": ObjectId(kwargs.get("pk")) })
+
+    def obj_delete_list(self, request=None, **kwargs):
+        """
+        Removes all documents from collection
+        """
+        self.is_authorized("delete_detail",self.get_object_list(request=bundle.request), bundle)
+        self.get_collection().remove()
+
+    def get_resource_uri(self, bundle=None, **kwargs):
+        """
+        Returns resource URI for bundle or object.
+        """
+        api_name = self.resource_uri_kwargs()['api_name']
+
+        if bundle==None:
+            return reverse("api_dispatch_list", kwargs={"resource_name": self._meta.resource_name, "api_name":api_name})
+
+        if isinstance(bundle, Bundle):
+            pk = bundle.obj._id
+        else:
+            pk = bundle._id
+
+        return reverse("api_dispatch_detail", kwargs={"resource_name": self._meta.resource_name,"pk": pk , "api_name":api_name })
