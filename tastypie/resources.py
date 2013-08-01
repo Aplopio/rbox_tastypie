@@ -402,27 +402,27 @@ class Resource(object):
             sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self,
                     parent_pk=pk, parent_obj=parent_obj, parent_field=field.attribute)
 
-            try:
-                manager = parent_obj
-
-                for att in field.attribute.split('__'):
-                    manager=getattr(manager,att)
-                sub_resource_obj._meta.queryset = manager.all()
-            except AttributeError: #Happens when this is ToOneSubResourceField
-
-                if manager:
-                    sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.filter(pk=manager.id) #manager refers to the one to one id
-                else:
-                    sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.none()
-            except ObjectDoesNotExist:
-                sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.none()
-
             resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
             try:
                 if rest_of_url[-1] != '/':
                     rest_of_url = "%s%s" %(rest_of_url, trailing_slash())
                 callback, callback_args, callback_kwargs = resolver.resolve(rest_of_url)
                 callback_kwargs.update({'%s_resource_name'%self._meta.resource_name: self._meta.resource_name, '%s_pk'%self._meta.resource_name: pk, 'api_name': self._meta.api_name})
+                try:
+                    manager = parent_obj
+                    for att in field.attribute.split('__'):
+                        manager=getattr(manager,att)
+                    sub_resource_obj._meta.queryset = manager.all()
+                except AttributeError: #Happens when this is ToOneSubResourceField
+                    if manager:
+                        sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.model.objects.filter(pk=manager.id) 
+                        #manager refers to the one to one id
+                        #doing it via model.objects due to cache problems
+                    else:
+                        sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.none()
+                except ObjectDoesNotExist:
+                    sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset._clone().none()
+
                 return callback(request, *callback_args, **callback_kwargs)
             except Http404:
                 pass
