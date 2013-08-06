@@ -726,7 +726,6 @@ class Resource(object):
         try:
             auth_result = getattr(self._meta.authorization, action)(object_list, bundle)
         except Unauthorized, exception:
-
             raise ImmediateResponse(response=self._meta.response_router_obj[bundle.request].get_unauthorized_request_response())
 
             #self.unauthorized_result(bundle.request, e)
