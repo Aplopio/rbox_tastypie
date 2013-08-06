@@ -716,11 +716,11 @@ class Resource(object):
         request_method = request.method.lower()
         self._meta.throttle.accessed(self._meta.authentication.get_identifier(request), url=request.get_full_path(), request_method=request_method)
 
-    def get_paginator(self, bundle, object_list):
+    def paginate(self, bundle, object_list):
         request = bundle.request
         paginator = self._meta.paginator_class(request.GET, object_list, resource_uri=self.get_resource_uri(),
                 limit=self._meta.limit, max_limit=self._meta.max_limit, collection_name=self._meta.collection_name)
-        return paginator
+        return paginator.page()
 
     def is_authorized(self, action,object_list, bundle ):
         try:
@@ -1483,8 +1483,7 @@ class Resource(object):
         objects = self.obj_get_list(bundle=base_bundle, **self.remove_api_resource_names(kwargs))
         sorted_objects = self.apply_sorting(objects, options=request.GET)
 
-        paginator = self.get_paginator(base_bundle, sorted_objects)
-        to_be_serialized = paginator.page()
+        to_be_serialized = self.paginate(base_bundle, sorted_objects)
 
         base_bundle = self.preprocess('read_list', base_bundle)
 
