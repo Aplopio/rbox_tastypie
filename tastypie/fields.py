@@ -13,10 +13,6 @@ from tastypie.bundle import Bundle
 from tastypie.exceptions import ApiFieldError, NotFound, HydrationError
 from tastypie.utils import dict_strip_unicode_keys, make_aware, LimitedSizeDict
 
-resolver_cache = LimitedSizeDict(size_limit=200)
-
-resolve = memoize(resolve, resolver_cache, 2)
-
 
 class NOT_PROVIDED:
     def __str__(self):
@@ -782,7 +778,8 @@ class RelatedField(ApiField):
         """
         should_dehydrate_full_resource = False
         if self.full:
-            is_details_view = resolve(bundle.request.path).url_name == "api_dispatch_detail"
+            #is_details_view = resolve(bundle.request.path).url_name == "api_dispatch_detail"
+            is_details_view = getattr(bundle.request, 'request_type', 'list') == 'detail'
             if is_details_view:
                 if (not callable(self.full_detail) and self.full_detail) or (callable(self.full_detail) and self.full_detail(bundle)):
                     should_dehydrate_full_resource = True

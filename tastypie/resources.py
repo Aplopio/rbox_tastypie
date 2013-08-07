@@ -596,6 +596,9 @@ class Resource(object):
         request = convert_post_to_put(request)
         response = method(request, **kwargs)
 
+        # RK: Set request_type on request
+        setattr(request, 'request_type', request_type)
+
         # Add the throttled request.
         self.log_throttled_access(request)
 
@@ -971,7 +974,6 @@ class Resource(object):
         return self.obj_get(bundle=bundle, **self.remove_api_resource_names(view_kwargs))
 
     # Data preparation.
-
     def full_dehydrate(self, bundle, for_list=False):
         """
         Given a bundle with an object instance, extract the information from it
