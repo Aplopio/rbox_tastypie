@@ -431,23 +431,30 @@ class Resource(object):
 
     def sub_resource_urls(self):
         sub_resource_field_list = []
-        url_list = []
+        url_list=[]
         for name, field in self.fields.items():
             if isinstance(field, fields.BaseSubResourceField):
+                url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(self._meta.resource_name,field.to._meta.resource_name), self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.to._meta.resource_name) )]
                 sub_resource_field_list.append(field)
         if len(sub_resource_field_list) > 0:
             url_list += [
                 url(r"^(?P<resource_name>%s)/(?P<pk>\w+)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name,
                                                                                        self._meta.resource_name),
-                    self.wrap_view('view_to_handle_subresource'), {'%s_sub_resource_field_list'%(self._meta.resource_name): sub_resource_field_list})
+                    self.wrap_view('view_to_handle_subresource'), {'%s_sub_resource_field_list'%(self._meta.resource_name): sub_resource_field_list}),
             ]
 
         for name, field in self.fields.items():
             if isinstance(field, fields.BaseSubResourceField):
                 include_urls = include(field.to_class(api_name=self._meta.api_name).urls)
-                url_list += [url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls)]
+
+                url_list += [
+                    url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls), 
+                             ]
         return url_list
 
+    def build_sub_resource_schema(self,request,*args,**kwargs):
+        data = self.fields[kwargs['sub_resource_name']].to().build_schema()
+        return self.create_response(request, data)
 
     @property
     def urls(self):
@@ -1145,6 +1152,14 @@ class Resource(object):
                     related_type = 'to_one'
                 data['fields'][field_name]['related_type'] = related_type
 
+                if isinstance(field_object, fields.BaseSubResourceField):
+
+                    data['fields'][field_name]['schema'] =  "%s%s/schema/"%(self.get_resource_uri(),field_name)
+                else:
+                    data['fields'][field_name]['schema'] = unicode(field_object.to_class().get_resource_uri()) + "schema/"
+                    if not field_object.to_class().get_resource_uri():
+                        data['fields'][field_name]['schema'] = field_object.to_class().build_schema()
+                        data['fields'][field_name]['type'] = "dictionary"
         return data
 
     def dehydrate_resource_uri(self, bundle):
