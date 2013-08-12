@@ -756,8 +756,6 @@ class RelatedField(ApiField):
             else:
                 if self.fk_resource._meta.create_on_related_fields:
                     bundle = self.resource_from_data(self.fk_resource, value, **kwargs)
-                    if bundle.obj.pk and orig_bundle: #existing object found. Need not be saved
-                        orig_bundle.objects_saved.add(self.fk_resource.create_identifier(bundle.obj))
                 else:
                     raise ApiFieldError("Related data provided for %s does not have resource_uri field" %self.instance_name)
             return bundle
