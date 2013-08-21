@@ -28,7 +28,7 @@ class EventHandler(object):
         """
         Called after dehydrate object is executed.
         object_list: list of authorized objects that can be read by the user
-        bundle: bundle - bundle.obj is the object being requested. dehydration is already 
+        bundle: bundle - bundle.obj is the object being requested. dehydration is already
         executed and bundle.data has dehydrated data
         """
         pass
@@ -64,7 +64,9 @@ class EventHandler(object):
 
 class MultiEventHandler(EventHandler):
 
-    def __init__(self, event_handlers=[], *args, **kwargs):
+    def __init__(self, event_handlers=None, *args, **kwargs):
+        if event_handlers == None:
+            event_handlers = []
         self.event_handlers = event_handlers
         self._event_handlers = None
         super(MultiEventHandler,self).__init__(*args, **kwargs)
