@@ -1149,14 +1149,16 @@ class Resource(object):
             }
             if field_object.dehydrated_type == 'related':
 
-                if isinstance(field_object, fields.ToOneField):
-                    related_type = 'ToOneField'
-                elif isinstance(field_object, fields.ToManyField):
-                    related_type = 'ToManyField'
-                elif isinstance(field_object, fields.ToOneSubResourceField):
+
+                if isinstance(field_object, fields.ToOneSubResourceField):
                     related_type = 'ToOneSubResourceField'
                 elif isinstance(field_object, fields.ToManySubResourceField):
                     related_type = 'ToManySubResourceField'
+                elif isinstance(field_object, fields.ToOneField):
+                    related_type = 'ToOneField'
+                elif isinstance(field_object, fields.ToManyField):
+                    related_type = 'ToManyField'
+
                 data['fields'][field_name]['related_type'] = related_type
 
                 if isinstance(field_object, fields.BaseSubResourceField):
