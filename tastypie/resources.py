@@ -415,7 +415,7 @@ class Resource(object):
                     sub_resource_obj._meta.queryset = manager.all()
                 except AttributeError: #Happens when this is ToOneSubResourceField
                     if manager:
-                        sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.model.objects.filter(pk=manager.id) 
+                        sub_resource_obj._meta.queryset = sub_resource_obj._meta.queryset.model.objects.filter(pk=manager.id)
                         #manager refers to the one to one id
                         #doing it via model.objects due to cache problems
                     else:
@@ -448,7 +448,7 @@ class Resource(object):
                 include_urls = include(field.to_class(api_name=self._meta.api_name).urls)
 
                 url_list += [
-                    url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls), 
+                    url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls),
                              ]
         return url_list
 
@@ -1148,20 +1148,25 @@ class Resource(object):
                 'unique': field_object.unique,
             }
             if field_object.dehydrated_type == 'related':
-                if getattr(field_object, 'is_m2m', False):
-                    related_type = 'to_many'
-                else:
-                    related_type = 'to_one'
+
+                if isinstance(field_object, fields.ToOneField):
+                    related_type = 'ToOneField'
+                elif isinstance(field_object, fields.ToManyField):
+                    related_type = 'ToManyField'
+                elif isinstance(field_object, fields.ToOneSubResourceField):
+                    related_type = 'ToOneSubResourceField'
+                elif isinstance(field_object, fields.ToManySubResourceField):
+                    related_type = 'ToManySubResourceField'
                 data['fields'][field_name]['related_type'] = related_type
 
                 if isinstance(field_object, fields.BaseSubResourceField):
-
                     data['fields'][field_name]['schema'] =  "%s%s/schema/"%(self.get_resource_uri(),field_name)
                 else:
                     data['fields'][field_name]['schema'] = unicode(field_object.to_class().get_resource_uri()) + "schema/"
                     if not field_object.to_class().get_resource_uri():
                         data['fields'][field_name]['schema'] = field_object.to_class().build_schema()
-                        data['fields'][field_name]['type'] = "dictionary"
+                        data['fields'][field_name]['type'] = "map"
+                        del data['fields'][field_name]["related_type"]
         return data
 
     def dehydrate_resource_uri(self, bundle):
