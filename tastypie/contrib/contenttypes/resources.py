@@ -62,5 +62,6 @@ class GenericResource(ModelResource):
 
         parent_resource = resource_class(api_name=self._meta.api_name)
         kwargs = parent_resource.remove_api_resource_names(kwargs)
-        bundle = Bundle(request=request)
+        #bundle = Bundle(request=request) #Not sure why we are instantiating directly. Changing it to build_bundle
+        bundle = parent_resource.build_bundle(request=request)
         return parent_resource.obj_get(bundle, **kwargs)

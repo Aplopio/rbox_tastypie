@@ -571,7 +571,7 @@ class RelatedField(ApiField):
             if self._resource and not self._resource._meta.api_name is None:
                 related_resource._meta.api_name = self._resource._meta.api_name
 
-                                                            # Try to be efficient about DB queries.
+        # Try to be efficient about DB queries.
         related_resource.instance = related_instance
         return related_resource
 
@@ -724,7 +724,7 @@ class RelatedField(ApiField):
         Accepts either a URI, a data dictionary (or dictionary-like structure)
         or an object with a ``pk``.
         """
-        self.fk_resource = self.get_related_resource(related_obj)
+        self.fk_resource = self.get_related_resource(related_obj, orig_bundle)
         kwargs = {
             'request': request,
             'related_obj': related_obj,
@@ -868,7 +868,7 @@ class ToOneField(RelatedField):
 
                 setattr(related_obj, self.related_name, bundle.obj)
 
-            related_resource = self.get_related_resource(related_obj)
+            related_resource = self.get_related_resource(related_obj, bundle)
             # Before we build the bundle & try saving it, let's make sure we
             # haven't already saved it.
             obj_id = related_resource.create_identifier(related_obj)
@@ -1027,7 +1027,7 @@ class ToManyField(RelatedField):
     def get_related_objs(self, bundle):
         related_objs = []
         for related_bundle in bundle.data[self.instance_name]:
-            related_resource = self.get_related_resource(bundle.obj)
+            related_resource = self.get_related_resource(bundle.obj, bundle)
 
             # Before we build the bundle & try saving it, let's make sure we
             # haven't already saved it.
@@ -1087,8 +1087,10 @@ class BaseSubResourceField(object):
         """
         related_resource = super(BaseSubResourceField, self).get_related_resource(related_instance, bundle)
         if bundle:
-            related_resource.parent_resource = getattr(self, 'resource_obj')
+            related_resource.parent_resource = bundle.resource
             related_resource.parent_pk = bundle.obj.pk
+            related_resource.parent_obj = bundle.obj
+            related_resource.parent_field = self.instance_name
 
         return related_resource
 

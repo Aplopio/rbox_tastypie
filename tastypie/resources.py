@@ -398,9 +398,7 @@ class Resource(object):
             return self._meta.response_router_obj[request].get_not_found_response()
 
         for field in sub_resource_field_list:
-            sub_resource_cls = field.to_class
-            sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name, parent_resource=self,
-                    parent_pk=pk, parent_obj=parent_obj, parent_field=field.attribute)
+            sub_resource_obj = field.get_related_resource(parent_obj, parent_bundle)
 
             resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
             try:
@@ -836,6 +834,7 @@ class Resource(object):
             obj=obj,
             data=data,
             request=request,
+            resource=self,
             objects_saved=objects_saved,
             parent_obj=self.parent_obj,
             parent_resource = self.parent_resource
@@ -964,7 +963,6 @@ class Resource(object):
 
         if prefix and chomped_uri.startswith(prefix):
             chomped_uri = chomped_uri[len(prefix)-1:]
-
         try:
             view, view_args, view_kwargs = resolve(chomped_uri)
             if self.parent_obj:
@@ -998,12 +996,13 @@ class Resource(object):
             else:
                 if field_use_in not in use_in:
                     continue
-
+            '''
             # A touch leaky but it makes URI resolution work.
             if getattr(field_object, 'dehydrated_type', None) == 'related':
                 field_object.api_name = self._meta.api_name
                 field_object.resource_name = self._meta.resource_name
                 field_object.resource_obj = self
+            '''
             bundle.data[field_name] = field_object.dehydrate(bundle)
 
             # Check for an optional method to do further dehydration.
@@ -1697,7 +1696,9 @@ class Resource(object):
         """
         # Manually construct the bundle here, since we don't want to try to
         # delete an empty instance.
-        bundle = Bundle(request=request)
+        bundle = self.build_bundle(request=request)
+        bundle.obj = None
+        #bundle = Bundle(request=request)
         try:
             self.obj_delete(bundle=bundle, **self.remove_api_resource_names(kwargs))
             return  self._meta.response_router_obj[request].get_no_content_response()
@@ -2356,8 +2357,7 @@ class ModelResource(Resource):
 
                 if getattr(field_object, 'is_related', False) and getattr(field_object,
                                                                           'full', False):
-                    sub_resource_cls = field_object.to_class
-                    sub_resource_obj = sub_resource_cls(api_name=self._meta.api_name)
+                    sub_resource_obj = field_object.get_related_resource(None, None)
                     sr_prefetch_related_set, sr_select_related_set = sub_resource_obj.get_query_optimizer_params(bundle, for_list=for_list)
                     sr_prefetch_related_set = ['%s__%s' %(field_object.attribute,prefetch) for prefetch in sr_prefetch_related_set]
                     sr_select_related_set = ['%s__%s' %(field_object.attribute,select_related) for select_related in sr_select_related_set]
