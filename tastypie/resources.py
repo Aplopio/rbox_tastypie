@@ -1147,8 +1147,6 @@ class Resource(object):
                 'unique': field_object.unique,
             }
             if field_object.dehydrated_type == 'related':
-
-
                 if isinstance(field_object, fields.ToOneSubResourceField):
                     related_type = 'ToOneSubResourceField'
                 elif isinstance(field_object, fields.ToManySubResourceField):
@@ -1157,6 +1155,11 @@ class Resource(object):
                     related_type = 'ToOneField'
                 elif isinstance(field_object, fields.ToManyField):
                     related_type = 'ToManyField'
+                else:
+                    if getattr(field_object, 'is_m2m', False):
+                        related_type = 'ToManyField'
+                    else:
+                        related_type = 'ToOneField'
 
                 data['fields'][field_name]['related_type'] = related_type
 
