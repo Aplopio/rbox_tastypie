@@ -1163,13 +1163,17 @@ class Resource(object):
 
                 data['fields'][field_name]['related_type'] = related_type
 
+
                 if isinstance(field_object, fields.BaseSubResourceField):
-                    data['fields'][field_name]['schema'] =  "%s%s/schema/"%(self.get_resource_uri(),field_name)
+
+                    data['fields'][field_name]['schema'] ="%s%s/schema/"%(self.get_resource_uri(),field_name)
                 else:
-                    data['fields'][field_name]['schema'] = unicode(field_object.to_class().get_resource_uri()) + "schema/"
-                    if not field_object.to_class().get_resource_uri():
+                    related_resource = field_object.get_related_resource()
+                    data['fields'][field_name]['schema'] = unicode(related_resource.get_resource_uri())+ "schema/"  #unicode(.get_resource_uri()) + "schema/"
+
+                    if related_resource._meta.include_resource_uri==False or not field_object.to_class().get_resource_uri():
                         data['fields'][field_name]['schema'] = field_object.to_class().build_schema()
-                        data['fields'][field_name]['type'] = "map"
+                        data['fields'][field_name]['type'] = "dict"
                         del data['fields'][field_name]["related_type"]
         return data
 

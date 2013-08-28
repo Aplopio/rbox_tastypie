@@ -45,7 +45,7 @@ class ApiField(object):
     dehydrated_type = 'string'
     help_text = ''
 
-    def __init__(self, attribute=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False, 
+    def __init__(self, attribute=None, default=NOT_PROVIDED, null=False, blank=False, readonly=False,
             unique=False, help_text=None, use_in='all', change_handler=None):
         """
         Sets up the field. This is generally called when the containing
@@ -560,7 +560,7 @@ class RelatedField(ApiField):
         if self.self_referential or self.to == 'self':
             self._to_class = cls
 
-    def get_related_resource(self, related_instance, bundle=None):
+    def get_related_resource(self, related_instance=None, bundle=None):
         """
         Instaniates the related resource.
         """
@@ -798,7 +798,7 @@ class ToOneField(RelatedField):
 
     def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED,
                  null=False, blank=False, readonly=False, full=False,
-                 unique=False, help_text=None, use_in='all', full_list=True, 
+                 unique=False, help_text=None, use_in='all', full_list=True,
                  full_detail=True, change_handler=None):
         super(ToOneField, self).__init__(
             to, attribute, related_name=related_name, default=default,
@@ -915,13 +915,13 @@ class ToManyField(RelatedField):
 
     def __init__(self, to, attribute, related_name=None, default=NOT_PROVIDED,
                  null=False, blank=False, readonly=False, full=False,
-                 unique=False, help_text=None, use_in='all', full_list=True, 
+                 unique=False, help_text=None, use_in='all', full_list=True,
                  full_detail=True, change_handler=None):
         super(ToManyField, self).__init__(
             to, attribute, related_name=related_name, default=default,
             null=null, blank=blank, readonly=readonly, full=full,
             unique=unique, help_text=help_text, use_in=use_in,
-            full_list=full_list, full_detail=full_detail, 
+            full_list=full_list, full_detail=full_detail,
             change_handler=change_handler
         )
         self.m2m_bundles = []
