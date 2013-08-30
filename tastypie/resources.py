@@ -196,7 +196,25 @@ class DeclarativeMetaclass(type):
         return new_class
 
 
+def sub_resource_schema_urls(resource, field):
+
+    url_list=[]
+
+    for resource_field_name, resource_field in resource.fields.items():
+        if isinstance(resource_field, fields.BaseSubResourceField):
+            url_list += sub_resource_schema_urls(resource_field.get_related_resource(), resource_field)
+        else:
+
+            #if resource._meta.resource_name == "candidate_messages":
+            #    import ipdb; ipdb.set_trace()
+
+
+            url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(resource._meta.resource_name,field.get_related_resource()._meta.resource_name), resource.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(resource._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
+
+    return url_list
+
 class Resource(object):
+
     """
     Handles the data, request dispatch and responding to requests.
 
@@ -430,28 +448,58 @@ class Resource(object):
     def sub_resource_urls(self):
         sub_resource_field_list = []
         url_list=[]
+
         for name, field in self.fields.items():
+
             if isinstance(field, fields.BaseSubResourceField):
-                url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(self._meta.resource_name,field.to._meta.resource_name), self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.to._meta.resource_name) )]
+
+                url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name), self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
+
+                #print ""
+                #print self._meta.resource_name
+                #print name
+                #print "^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name)
+                #print ""
+                #if self._meta.resource_name == "candidate_messages":
+                #    import ipdb; ipdb.set_trace()
+
+                #url_list += [url(r"^candidates/(?P<resource_name>candidate_messages)/(?P<sub_resource_name>comments)/schema/", self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
+
+
                 sub_resource_field_list.append(field)
+
         if len(sub_resource_field_list) > 0:
             url_list += [
                 url(r"^(?P<resource_name>%s)/(?P<pk>\w+)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name,
                                                                                        self._meta.resource_name),
                     self.wrap_view('view_to_handle_subresource'), {'%s_sub_resource_field_list'%(self._meta.resource_name): sub_resource_field_list}),
+
+
             ]
+
+            # print ""
+            # print self._meta.resource_name
+            # print name
+            # print "^(?P<resource_name>%s)/(?P<pk>\w+)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name, self._meta.resource_name)
+            #print ""
+
 
         for name, field in self.fields.items():
             if isinstance(field, fields.BaseSubResourceField):
-                include_urls = include(field.to_class(api_name=self._meta.api_name).urls)
-
+                include_urls = include(field.get_related_resource().urls)
                 url_list += [
                     url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls),
-                             ]
+
+                           ]
+
+
+
         return url_list
 
+
+
     def build_sub_resource_schema(self,request,*args,**kwargs):
-        data = self.fields[kwargs['sub_resource_name']].to().build_schema()
+        data = self.fields[kwargs['sub_resource_name']].get_related_resource().build_schema()
         return self.create_response(request, data)
 
     @property
@@ -1136,8 +1184,14 @@ class Resource(object):
         if self._meta.filtering:
             data['filtering'] = self._meta.filtering
 
+        #bundle = self.build_bundle()
+
         for field_name, field_object in self.fields.items():
-            data['fields'][field_name] = {
+            #import ipdb; ipdb.set_trace()
+            self.get_resource_uri()
+            data['fields'][field_name] = field_object.build_schema(field_name=field_name,resource_uri=self.get_resource_uri() )
+            """
+            {
                 'default': field_object.default,
                 'type': field_object.dehydrated_type,
                 'nullable': field_object.null,
@@ -1147,34 +1201,8 @@ class Resource(object):
                 'unique': field_object.unique,
             }
             if field_object.dehydrated_type == 'related':
-                if isinstance(field_object, fields.ToOneSubResourceField):
-                    related_type = 'ToOneSubResourceField'
-                elif isinstance(field_object, fields.ToManySubResourceField):
-                    related_type = 'ToManySubResourceField'
-                elif isinstance(field_object, fields.ToOneField):
-                    related_type = 'ToOneField'
-                elif isinstance(field_object, fields.ToManyField):
-                    related_type = 'ToManyField'
-                else:
-                    if getattr(field_object, 'is_m2m', False):
-                        related_type = 'ToManyField'
-                    else:
-                        related_type = 'ToOneField'
-
-                data['fields'][field_name]['related_type'] = related_type
-
-
-                if isinstance(field_object, fields.BaseSubResourceField):
-
-                    data['fields'][field_name]['schema'] ="%s%s/schema/"%(self.get_resource_uri(),field_name)
-                else:
-                    related_resource = field_object.get_related_resource()
-                    data['fields'][field_name]['schema'] = unicode(related_resource.get_resource_uri())+ "schema/"  #unicode(.get_resource_uri()) + "schema/"
-
-                    if related_resource._meta.include_resource_uri==False or not field_object.to_class().get_resource_uri():
-                        data['fields'][field_name]['schema'] = field_object.to_class().build_schema()
-                        data['fields'][field_name]['type'] = "dict"
-                        del data['fields'][field_name]["related_type"]
+                pass
+           """
         return data
 
     def dehydrate_resource_uri(self, bundle):

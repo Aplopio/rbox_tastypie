@@ -103,6 +103,19 @@ class ApiField(object):
         if help_text:
             self.help_text = help_text
 
+    def build_schema(self, **kwargs):
+        field_schema = {
+            'default': self.default,
+            'type': self.dehydrated_type,
+            'nullable': self.null,
+            'blank': self.blank,
+            'readonly': self.readonly,
+            'help_text': self.help_text,
+            'unique': self.unique,
+            }
+        return field_schema
+
+
     @property
     def formfield(self):
         return djangoform.CharField
@@ -551,6 +564,30 @@ class RelatedField(ApiField):
         if help_text:
             self.help_text = help_text
 
+    def build_schema(self, **kwargs):
+        field_schema = super(RelatedField, self).build_schema(**kwargs)
+        return field_schema
+
+
+
+        if not hasattr(self, "related_type"):
+            raise ApiFieldError("All related fields must have attribute related_type")
+
+        return
+
+        if isinstance(field_object, fields.BaseSubResourceField):
+            data['fields'][field_name]['schema'] ="%s%s/schema/"%(self.get_resource_uri(),field_name)
+        else:
+            related_resource = field_object.get_related_resource()
+            data['fields'][field_name]['schema'] = unicode(related_resource.get_resource_uri())+ "schema/"  #unicode(.get_resource_uri()) + "schema/"
+
+            if related_resource._meta.include_resource_uri==False or not field_object.to_class().get_resource_uri():
+                data['fields'][field_name]['schema'] = field_object.to_class().build_schema()
+                data['fields'][field_name]['type'] = "dict"
+                del data['fields'][field_name]["related_type"]
+        return data
+
+
     def contribute_to_class(self, cls, name):
         super(RelatedField, self).contribute_to_class(cls, name)
 
@@ -811,6 +848,18 @@ class ToOneField(RelatedField):
     def resource_from_data(self, fk_resource, data, request=None, related_obj=None, related_name=None):
         return super(ToOneField, self).resource_from_data(fk_resource, data, request, related_obj, related_name)
 
+    def build_schema(self, **kwargs):
+
+        field_schema = super(ToOneField, self).build_schema(**kwargs)
+        related_resource = self.get_related_resource()
+        if hasattr(related_resource.__class__.Meta, "api_name"):
+            field_schema['related_type'] = "ToOneField"
+            field_schema['schema'] = "%sschema/"%(related_resource.get_resource_uri())
+        else:
+            field_schema['type'] = "dict"
+        return field_schema
+
+
     def dehydrate(self, bundle):
         foreign_obj = None
 
@@ -925,6 +974,16 @@ class ToManyField(RelatedField):
             change_handler=change_handler
         )
         self.m2m_bundles = []
+
+
+    def build_schema(self, **kwargs):
+        field_schema = super(ToManyField, self).build_schema(**kwargs)
+        field_schema['related_type'] = "ToManyField"
+
+        related_resource = self.get_related_resource()
+        field_schema['schema'] = "%sschema/"%(related_resource.get_resource_uri())
+
+        return field_schema
 
     def dehydrate(self, bundle):
         if not bundle.obj or not bundle.obj.pk:
@@ -1094,10 +1153,22 @@ class BaseSubResourceField(object):
 
         return related_resource
 
+
 class ToOneSubResourceField(BaseSubResourceField, ToOneField):
     def __init__(self, *args, **kwargs):
         kwargs['readonly'] = True
         super(ToOneSubResourceField, self).__init__(*args, **kwargs)
+
+    def build_schema(self, **kwargs):
+        field_schema = super(ToOneSubResourceField, self).build_schema(**kwargs)
+        field_schema['related_type'] = "ToOneSubResourceField"
+
+        related_resource = self.get_related_resource()
+
+        field_schema['schema'] = "%s%s/schema/"%(kwargs['resource_uri'], related_resource._meta.resource_name)
+
+        return field_schema
+
 
 class ToManySubResourceField(BaseSubResourceField, ToManyField):
     def __init__(self, *args, **kwargs):
@@ -1105,6 +1176,14 @@ class ToManySubResourceField(BaseSubResourceField, ToManyField):
         if not 'related_name' in kwargs:
             raise TypeError('Please specify a related name')
         super(ToManySubResourceField, self).__init__(*args, **kwargs)
+
+    def build_schema(self, **kwargs):
+        field_schema = super(ToManySubResourceField, self).build_schema(**kwargs)
+
+        field_schema['related_type'] = "ToManySubResourceField"
+        related_resource = self.get_related_resource()
+        field_schema['schema'] = "%s%s/schema/"%(kwargs['resource_uri'], related_resource._meta.resource_name)
+        return field_schema
 
 
     def dehydrate(self, bundle):
