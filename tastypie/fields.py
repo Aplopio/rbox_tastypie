@@ -854,7 +854,7 @@ class ToOneField(RelatedField):
         related_resource = self.get_related_resource()
         # ASSUMING THAT IF THERE IS NO RESOURCE_URI THEN IT IS
         # A DICTIONARY
-        if related_resource.include_resource_uri == False:
+        if related_resource._meta.include_resource_uri == False:
             field_schema['type'] = "dict"
         else:
             field_schema['related_type'] = "ToOneField"
