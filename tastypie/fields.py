@@ -852,11 +852,14 @@ class ToOneField(RelatedField):
 
         field_schema = super(ToOneField, self).build_schema(**kwargs)
         related_resource = self.get_related_resource()
-        if hasattr(related_resource.__class__.Meta, "api_name"):
+        # ASSUMING THAT IF THERE IS NO RESOURCE_URI THEN IT IS
+        # A DICTIONARY
+        if related_resource.include_resource_uri == False:
+            field_schema['type'] = "dict"
+        else:
             field_schema['related_type'] = "ToOneField"
             field_schema['schema'] = "%sschema/"%(related_resource.get_resource_uri())
-        else:
-            field_schema['type'] = "dict"
+
         return field_schema
 
 

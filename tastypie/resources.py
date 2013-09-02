@@ -1161,25 +1161,10 @@ class Resource(object):
         if self._meta.filtering:
             data['filtering'] = self._meta.filtering
 
-        #bundle = self.build_bundle()
-
         for field_name, field_object in self.fields.items():
-            #import ipdb; ipdb.set_trace()
+
             self.get_resource_uri()
             data['fields'][field_name] = field_object.build_schema(field_name=field_name,resource_uri=self.get_resource_uri() )
-            """
-            {
-                'default': field_object.default,
-                'type': field_object.dehydrated_type,
-                'nullable': field_object.null,
-                'blank': field_object.blank,
-                'readonly': field_object.readonly,
-                'help_text': field_object.help_text,
-                'unique': field_object.unique,
-            }
-            if field_object.dehydrated_type == 'related':
-                pass
-           """
         return data
 
     def dehydrate_resource_uri(self, bundle):
