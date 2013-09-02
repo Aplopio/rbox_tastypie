@@ -450,22 +450,8 @@ class Resource(object):
         url_list=[]
 
         for name, field in self.fields.items():
-
             if isinstance(field, fields.BaseSubResourceField):
-
-                url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name), self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
-
-                #print ""
-                #print self._meta.resource_name
-                #print name
-                #print "^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name)
-                #print ""
-                #if self._meta.resource_name == "candidate_messages":
-                #    import ipdb; ipdb.set_trace()
-
-                #url_list += [url(r"^candidates/(?P<resource_name>candidate_messages)/(?P<sub_resource_name>comments)/schema/", self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
-
-
+                url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>.+)/schema/"%(self._meta.resource_name,), self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
                 sub_resource_field_list.append(field)
 
         if len(sub_resource_field_list) > 0:
@@ -473,16 +459,7 @@ class Resource(object):
                 url(r"^(?P<resource_name>%s)/(?P<pk>\w+)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name,
                                                                                        self._meta.resource_name),
                     self.wrap_view('view_to_handle_subresource'), {'%s_sub_resource_field_list'%(self._meta.resource_name): sub_resource_field_list}),
-
-
             ]
-
-            # print ""
-            # print self._meta.resource_name
-            # print name
-            # print "^(?P<resource_name>%s)/(?P<pk>\w+)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name, self._meta.resource_name)
-            #print ""
-
 
         for name, field in self.fields.items():
             if isinstance(field, fields.BaseSubResourceField):
@@ -491,15 +468,15 @@ class Resource(object):
                     url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls),
 
                            ]
-
-
-
         return url_list
 
 
-
     def build_sub_resource_schema(self,request,*args,**kwargs):
-        data = self.fields[kwargs['sub_resource_name']].get_related_resource().build_schema()
+        sub_resource = kwargs['sub_resource_name']
+        resource = self
+        for sub_resource_name in sub_resource.split("/"):
+            resource = resource.fields[sub_resource_name].get_related_resource()
+        data = resource.build_schema()
         return self.create_response(request, data)
 
     @property
