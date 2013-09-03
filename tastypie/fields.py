@@ -981,10 +981,13 @@ class ToManyField(RelatedField):
 
     def build_schema(self, **kwargs):
         field_schema = super(ToManyField, self).build_schema(**kwargs)
-        field_schema['related_type'] = "ToManyField"
-
         related_resource = self.get_related_resource()
-        field_schema['schema'] = "%sschema/"%(related_resource.get_resource_uri())
+
+        if related_resource._meta.include_resource_uri == False:
+            field_schema['type'] = "list"
+        else:
+            field_schema['related_type'] = "ToManyField"
+            field_schema['schema'] = "%sschema/"%(related_resource.get_resource_uri())
 
         return field_schema
 
