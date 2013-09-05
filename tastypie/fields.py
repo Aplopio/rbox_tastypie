@@ -1170,9 +1170,20 @@ class ToOneSubResourceField(BaseSubResourceField, ToOneField):
         field_schema['related_type'] = "ToOneSubResourceField"
 
         related_resource = self.get_related_resource()
+        related_resource.parent_resource = kwargs['resource']
+        resource = related_resource
+        schema_url = "schema/"
+        while True:
+            if hasattr(resource, "parent_resource") and getattr(resource,"parent_resource"):
+                schema_url = "%s/%s"%(resource._meta.resource_name, schema_url)
+                resource = resource.parent_resource
+            else:
+                schema_url = "%s%s"%(resource.get_resource_uri(), schema_url)
+                break
 
-        field_schema['schema'] = "%s%s/schema/"%(kwargs['resource_uri'], related_resource._meta.resource_name)
+        field_schema['schema'] = schema_url
 
+        ######"%s%s/schema/"%(kwargs['resource_uri'], related_resource._meta.resource_name)
         return field_schema
 
 
@@ -1185,10 +1196,22 @@ class ToManySubResourceField(BaseSubResourceField, ToManyField):
 
     def build_schema(self, **kwargs):
         field_schema = super(ToManySubResourceField, self).build_schema(**kwargs)
-
         field_schema['related_type'] = "ToManySubResourceField"
         related_resource = self.get_related_resource()
-        field_schema['schema'] = "%s%s/schema/"%(kwargs['resource_uri'], related_resource._meta.resource_name)
+        related_resource.parent_resource = kwargs['resource']
+        resource = related_resource
+        schema_url = "schema/"
+        while True:
+            if hasattr(resource, "parent_resource") and getattr(resource,"parent_resource"):
+                schema_url = "%s/%s"%(resource._meta.resource_name, schema_url)
+                resource = resource.parent_resource
+            else:
+                schema_url = "%s%s"%(resource.get_resource_uri(), schema_url)
+                break
+
+        field_schema['schema'] = schema_url
+
+        ######"%s%s/schema/"%(kwargs['resource_uri'], related_resource._meta.resource_name)
         return field_schema
 
 

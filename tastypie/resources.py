@@ -473,9 +473,11 @@ class Resource(object):
 
     def build_sub_resource_schema(self,request,*args,**kwargs):
         sub_resource = kwargs['sub_resource_name']
-        resource = self
+        parent_resource = self
         for sub_resource_name in sub_resource.split("/"):
-            resource = resource.fields[sub_resource_name].get_related_resource()
+            resource = parent_resource.fields[sub_resource_name].get_related_resource()
+            resource.parent_resource = parent_resource
+            parent_resource = resource
         data = resource.build_schema()
         return self.create_response(request, data)
 
@@ -1162,9 +1164,7 @@ class Resource(object):
             data['filtering'] = self._meta.filtering
 
         for field_name, field_object in self.fields.items():
-
-            self.get_resource_uri()
-            data['fields'][field_name] = field_object.build_schema(field_name=field_name,resource_uri=self.get_resource_uri() )
+            data['fields'][field_name] = field_object.build_schema(field_name=field_name,resource_uri=self.get_resource_uri(), resource=self)
         return data
 
     def dehydrate_resource_uri(self, bundle):
