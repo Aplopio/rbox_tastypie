@@ -16,7 +16,7 @@ from tastypie.authorization import ReadOnlyAuthorization
 from tastypie.bundle import Bundle
 from tastypie.cache import NoCache
 from tastypie.constants import ALL, ALL_WITH_RELATIONS
-from tastypie.exceptions import NotFound, BadRequest, InvalidFilterError, HydrationError, InvalidSortError, ImmediateResponse, Unauthorized, Forbidden
+from tastypie.exceptions import NotFound, BadRequest, InvalidFilterError, HydrationError, InvalidSortError, ImmediateResponse, Unauthorized, Forbidden, UnsupportedFormat
 from tastypie import fields
 from tastypie import http
 from tastypie.paginator import Paginator
@@ -204,10 +204,6 @@ def sub_resource_schema_urls(resource, field):
         if isinstance(resource_field, fields.BaseSubResourceField):
             url_list += sub_resource_schema_urls(resource_field.get_related_resource(), resource_field)
         else:
-
-            #if resource._meta.resource_name == "candidate_messages":
-            #    import ipdb; ipdb.set_trace()
-
 
             url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(resource._meta.resource_name,field.get_related_resource()._meta.resource_name), resource.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(resource._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
 
@@ -543,7 +539,14 @@ class Resource(object):
 
         Mostly a hook, this uses the ``Serializer`` from ``Resource._meta``.
         """
-        deserialized = self._meta.serializer.deserialize(data, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        try:
+            deserialized = self._meta.serializer.deserialize(data, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        except UnsupportedFormat, e:
+            errors = {"errors": e.message}
+            raise ImmediateResponse(response=self.error_response(request, errors))
+        except ValueError, e:
+            errors = {"errors": "Please provide a proper JSON string!"}
+            raise ImmediateResponse(response=self.error_response(request, errors))
         return deserialized
 
     def alter_list_data_to_serialize(self, request, data):
