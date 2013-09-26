@@ -2183,7 +2183,6 @@ class ModelResource(Resource):
                         value.extend(part.split(','))
                 else:
                     value = value.split(',')
-            raise Exception('')
             return value
         except Exception, e:
             try:
