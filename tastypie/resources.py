@@ -2187,7 +2187,7 @@ class ModelResource(Resource):
         except Exception, e:
             try:
                 logger = logging.getLogger("tastypie.resources.filter_value_to_python")
-                logger.error("filter_value_to_python - %s"%(value))
+                logger.error("filter_value_to_python - value-%s  filters-%s filter_expr-%s"%(value, filters, filter_expr))
             except:
                 pass
             raise e
