@@ -2167,29 +2167,31 @@ class ModelResource(Resource):
         Turn the string ``value`` into a python object.
         """
         try:
-            logger = logging.getLogger("tastypie.resources.filter_value_to_python")
-            logger.error("filter_value_to_python - value-%s  filters-%s filter_expr-%s"%(value, filters, filter_expr))
-        except:
-            pass
+            if value in ['true', 'True', True]:
+                value = True
+            elif value in ['false', 'False', False]:
+                value = False
+            elif value in ('nil', 'none', 'None', None):
+                value = None
 
-        if value in ['true', 'True', True]:
-            value = True
-        elif value in ['false', 'False', False]:
-            value = False
-        elif value in ('nil', 'none', 'None', None):
-            value = None
+            # Split on ',' if not empty string and either an in or range filter.
+            if filter_type in ('in', 'range') and len(value):
+                if hasattr(filters, 'getlist'):
+                    value = []
 
-        # Split on ',' if not empty string and either an in or range filter.
-        if filter_type in ('in', 'range') and len(value):
-            if hasattr(filters, 'getlist'):
-                value = []
-
-                for part in filters.getlist(filter_expr):
-                    value.extend(part.split(','))
-            else:
-                value = value.split(',')
-
-        return value
+                    for part in filters.getlist(filter_expr):
+                        value.extend(part.split(','))
+                else:
+                    value = value.split(',')
+            raise Exception('')
+            return value
+        except Exception, e:
+            try:
+                logger = logging.getLogger("tastypie.resources.filter_value_to_python")
+                logger.error("filter_value_to_python - value-%s  filters-%s filter_expr-%s"%(value, filters, filter_expr))
+            except:
+                pass
+            raise e
 
 
     def build_filters(self, filters=None, bundle=None):
