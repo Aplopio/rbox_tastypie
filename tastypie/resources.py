@@ -2397,6 +2397,7 @@ class ModelResource(Resource):
         Takes an optional ``request`` object, whose ``GET`` dictionary can be
         used to narrow the query.
         """
+
         filters = {}
         if hasattr(bundle.request, 'GET'):
             # Grab a mutable copy.
@@ -2422,6 +2423,8 @@ class ModelResource(Resource):
         """
         optimize_query = kwargs.pop('_optimize_query',False)
         try:
+            if kwargs.get("pk") and not kwargs.get("pk").isdigit():
+                raise ImmediateResponse(response=self.error_response(bundle.request, {"error_message":"Invalid 'id' given!"}))
             object_list = self.get_object_list(bundle.request).filter(**kwargs)
             if optimize_query:
                 object_list = self.optimize_query(object_list, bundle)
