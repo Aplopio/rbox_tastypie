@@ -1412,6 +1412,17 @@ class Resource(object):
 
         return response_class(content=serialized, content_type=build_content_type(desired_format))
 
+    def validate_to_one_subresource(self, bundle):
+        if self.parent_obj and self.parent_resource and\
+           isinstance(self.parent_resource.fields[self.parent_field], fields.ToOneSubResourceField):
+            try:
+                getattr(self.parent_obj, self.parent_resource.fields[self.parent_field].attribute)
+                #if exists then it shud be 400
+                raise ImmediateResponse(response=self.error_response(bundle.request, {"error_message":"'%s' already exists for this parent."%(self.parent_field )}))
+            except ObjectDoesNotExist:
+                pass
+        return {}
+
     def is_valid(self, bundle):
         """
         Handles checking if the data provided by the user is valid.
@@ -2452,6 +2463,7 @@ class ModelResource(Resource):
 
         self.is_authorized("create_detail", self.get_object_list(bundle.request), bundle)
         bundle = self.preprocess('create_detail', bundle)
+        self.validate_to_one_subresource(bundle)
         bundle = self.full_hydrate(bundle)
         bundle = self.save(bundle)
         self.fire_event('detail_created', args=(self.get_object_list(bundle.request), bundle))
