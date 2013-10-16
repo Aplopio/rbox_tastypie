@@ -1580,6 +1580,7 @@ class Resource(object):
         if not self._meta.always_return_data:
             return response_class(location=location)
         else:
+            updated_bundle.data = {}
             updated_bundle = self.full_dehydrate(updated_bundle)
             updated_bundle = self.alter_detail_data_to_serialize(request, updated_bundle)
             return self.create_response(request, updated_bundle, response_class=response_class, location=location)
