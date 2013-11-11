@@ -2440,7 +2440,7 @@ class ModelResource(Resource):
             object_list = self.get_object_list(bundle.request).filter(**kwargs)
             if optimize_query:
                 object_list = self.optimize_query(object_list, bundle)
-            stringified_kwargs = ', '.join(["%s=%s" % (k, v) for k, v in kwargs.items()])
+            stringified_kwargs = u", ".join([u"%s=%s" % (k, v) for k, v in kwargs.items()])
 
             if len(object_list) <= 0:
                 raise self._meta.object_class.DoesNotExist("Couldn't find an instance of '%s' which matched '%s'." % (self._meta.object_class.__name__, stringified_kwargs))
