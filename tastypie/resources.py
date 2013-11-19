@@ -1514,7 +1514,12 @@ class Resource(object):
         #       impossible.
         base_bundle = self.build_bundle(request=request)
         objects = self.obj_get_list(bundle=base_bundle, **self.remove_api_resource_names(kwargs))
-        sorted_objects = self.apply_sorting(objects, options=request.GET)
+
+        try:
+            sorted_objects = self.apply_sorting(objects, options=request.GET)
+        except (InvalidSortError) as e:
+            data = {"error": e.message}
+            return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
 
         to_be_serialized = self.paginate(base_bundle, sorted_objects)
 
