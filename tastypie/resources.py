@@ -408,6 +408,8 @@ class Resource(object):
         try:
             parent_bundle = self.build_bundle(request=request)
             parent_obj = self.obj_get(parent_bundle, **{'pk':pk})
+        except (ImmediateResponse) as e:
+            raise e
         except Exception:
             return self._meta.response_router_obj[request].get_not_found_response()
 
