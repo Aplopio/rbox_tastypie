@@ -361,6 +361,9 @@ class Resource(object):
                 message = "%s\n\n%s" % (the_trace, request_repr)
                 mail_admins(subject, message, fail_silently=True)
 
+        # Send the signal so other apps are aware of the exception.
+        got_request_exception.send(self.__class__, request=request)
+        
         # Prep the data going out.
         data = {
             "error_message":getattr(settings, 'TASTYPIE_CANNED_ERROR', "Sorry, this request could not be processed. Please try again later."),
