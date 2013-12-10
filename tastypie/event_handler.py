@@ -41,6 +41,12 @@ class EventHandler(object):
         pass
     '''
 
+    def list_action(self, object_list, bundle):
+        pass
+
+    def detail_action(self, object_list, bundle):
+        pass
+
     def detail_created(self, object_list, bundle):
         pass
 
@@ -119,6 +125,15 @@ class MultiEventHandler(EventHandler):
 
     def pre_delete_detail_handlers(self):
         return self.get_event_handlers()
+
+    def list_action(self, object_list, bundle):
+        for event_handler in self.read_list_handlers():
+            event_handler.list_action(object_list, bundle)
+
+    def detail_action(self, object_list, bundle):
+        for event_handler in self.read_list_handlers():
+            event_handler.detail_action(object_list, bundle)
+
 
     def list_read(self, object_list, bundle):
         for event_handler in self.read_list_handlers():
