@@ -1,16 +1,26 @@
+from __future__ import unicode_literals
 from __future__ import with_statement
 import simplejson
+from copy import deepcopy
 import logging
 import warnings
-import django
+
 from django.conf import settings
 from django.conf.urls.defaults import patterns, url, include
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured
 from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
+from django.core.signals import got_request_exception
 from django.db import transaction
+try:
+    from django.db.models.constants import LOOKUP_SEP
+except ImportError:
+    from django.db.models.sql.constants import LOOKUP_SEP
+
 from django.db.models.sql.constants import QUERY_TERMS
 from django.http import HttpResponse, HttpResponseNotFound, Http404
 from django.utils.cache import patch_cache_control, patch_vary_headers
+from django.utils import six
+
 from tastypie.authentication import Authentication
 from tastypie.authorization import ReadOnlyAuthorization
 from tastypie.bundle import Bundle
@@ -39,17 +49,11 @@ from bson import ObjectId
 from pymongo import MongoClient
 from tastypie.bundle import Bundle
 
-
 try:
     set
 except NameError:
     from sets import Set as set
-# The ``copy`` module became function-friendly in Python 2.5 and
-# ``copycompat`` was added in post 1.1.1 Django (r11901)..
-try:
-    from django.utils.copycompat import deepcopy
-except ImportError:
-    from copy import deepcopy
+
 # If ``csrf_exempt`` isn't present, stub it.
 try:
     from django.views.decorators.csrf import csrf_exempt
@@ -57,11 +61,6 @@ except ImportError:
     def csrf_exempt(func):
         return func
 
-# Django 1.5 has moved this constant up one level.
-try:
-    from django.db.models.constants import LOOKUP_SEP
-except ImportError:
-    from django.db.models.sql.constants import LOOKUP_SEP
 
 
 class NOT_AVAILABLE:
@@ -141,7 +140,10 @@ class ResourceOptions(object):
         if overrides.get('detail_allowed_methods', None) is None:
             overrides['detail_allowed_methods'] = allowed_methods
 
-        return object.__new__(type('ResourceOptions', (cls,), overrides))
+        if six.PY3:
+            return object.__new__(type('ResourceOptions', (cls,), overrides))
+        else:
+            return object.__new__(type(b'ResourceOptions', (cls,), overrides))
 
 
 class DeclarativeMetaclass(type):
@@ -163,7 +165,7 @@ class DeclarativeMetaclass(type):
         except NameError:
             pass
 
-        for field_name, obj in attrs.items():
+        for field_name, obj in attrs.copy().items():
             # Look for ``dehydrated_type`` instead of doing ``isinstance``,
             # which can break down if Tastypie is re-namespaced as something
             # else.
@@ -197,21 +199,7 @@ class DeclarativeMetaclass(type):
         return new_class
 
 
-def sub_resource_schema_urls(resource, field):
-
-    url_list=[]
-
-    for resource_field_name, resource_field in resource.fields.items():
-        if isinstance(resource_field, fields.BaseSubResourceField):
-            url_list += sub_resource_schema_urls(resource_field.get_related_resource(), resource_field)
-        else:
-
-            url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>%s)/schema/"%(resource._meta.resource_name,field.get_related_resource()._meta.resource_name), resource.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(resource._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
-
-    return url_list
-
-class Resource(object):
-
+class Resource(six.with_metaclass(DeclarativeMetaclass)):
     """
     Handles the data, request dispatch and responding to requests.
 
@@ -222,8 +210,6 @@ class Resource(object):
     This class tries to be non-model specific, so it can be hooked up to other
     data sources, such as search results, files, other data, etc.
     """
-    __metaclass__ = DeclarativeMetaclass
-
     def __init__(self, api_name=None, parent_resource=None, parent_pk=None, parent_obj=None, parent_field=None):
         self.fields = {k: copy(v) for k, v in self.base_fields.iteritems()}
         self.parent_resource=parent_resource
@@ -288,7 +274,7 @@ class Resource(object):
                     response = self._meta.response_router_obj[request].handle_cache_control(response, no_cache=True)
 
                 return response
-            except (BadRequest, fields.ApiFieldError), e:
+            except (BadRequest, fields.ApiFieldError) as e:
                 data = {"error": e.args[0] if getattr(e, 'args') else ''}
                 return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
             except ValidationError, e:
@@ -296,7 +282,6 @@ class Resource(object):
                 return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
             except Exception, e:
                 return self._handle_500(request, e)
-
 
         return wrapper
 
@@ -338,7 +323,7 @@ class Resource(object):
 
         if settings.DEBUG:
             data = {
-                "error_message": unicode(exception),
+                "error_message": six.text_type(exception),
                 "traceback": the_trace,
             }
             return self.error_response(request, data, response_class=response_class)
@@ -349,18 +334,11 @@ class Resource(object):
 
         if not response_code == 404 or send_broken_links:
             log = logging.getLogger('django.request.tastypie')
-            log.error('Internal Server Error: %s' % request.path, exc_info=sys.exc_info(), extra={'status_code': response_code, 'request':request})
+            log.error('Internal Server Error: %s' % request.path, exc_info=True,
+                      extra={'status_code': response_code, 'request': request})
 
-            if django.VERSION < (1, 3, 0):
-                from django.core.mail import mail_admins
-                subject = 'Error (%s IP): %s' % ((request.META.get('REMOTE_ADDR') in settings.INTERNAL_IPS and 'internal' or 'EXTERNAL'), request.path)
-                try:
-                    request_repr = repr(request)
-                except:
-                    request_repr = "Request repr() unavailable"
-
-                message = "%s\n\n%s" % (the_trace, request_repr)
-                mail_admins(subject, message, fail_silently=True)
+        # Send the signal so other apps are aware of the exception.
+        got_request_exception.send(self.__class__, request=request)
 
         # Send the signal so other apps are aware of the exception.
         got_request_exception.send(self.__class__, request=request)
@@ -699,7 +677,7 @@ class Resource(object):
             allowed = []
 
         request_method = request.method.lower()
-        allows = ','.join(map(str.upper, allowed))
+        allows = ','.join([meth.upper() for meth in allowed])
 
         if request_method == "options":
             response_class = self.get_default_response_class(request)
@@ -865,7 +843,7 @@ class Resource(object):
         ``Resource._meta.object_class`` is created so that attempts to access
         ``bundle.obj`` do not fail.
         """
-        if obj is None:
+        if obj is None and self._meta.object_class:
             obj = self._meta.object_class()
 
         return Bundle(
@@ -1041,7 +1019,7 @@ class Resource(object):
                 field_object.resource_name = self._meta.resource_name
                 field_object.resource_obj = self
             '''
-            bundle.data[field_name] = field_object.dehydrate(bundle)
+            bundle.data[field_name] = field_object.dehydrate(bundle, for_list=for_list)
 
             # Check for an optional method to do further dehydration.
             method = getattr(self, "dehydrate_%s" % field_name, None)
@@ -1101,7 +1079,13 @@ class Resource(object):
                         Changed the order of the follwing elif conditions to allow a fk field that can be blank to be set to a null value
                         '''
                         if value is not None:
-                            setattr(bundle.obj, field_object.attribute, value.obj)
+                            # NOTE: A bug fix in Django (ticket #18153) fixes incorrect behavior
+                            # which Tastypie was relying on.  To fix this, we store value.obj to
+                            # be saved later in save_related.
+                            try:
+                                setattr(bundle.obj, field_object.attribute, value.obj)
+                            except (ValueError, ObjectDoesNotExist):
+                                bundle.related_objects_to_save[field_object.attribute] = value.obj
                         elif field_object.blank:
                             continue
                         elif field_object.null:
@@ -1204,7 +1188,7 @@ class Resource(object):
             smooshed.append("%s=%s" % (key, value))
 
         # Use a list plus a ``.join()`` because it's faster than concatenation.
-        return "%s:%s:%s:%s" % (self._meta.api_name, self._meta.resource_name, ':'.join(args), ':'.join(smooshed))
+        return "%s:%s:%s:%s" % (self._meta.api_name, self._meta.resource_name, ':'.join(args), ':'.join(sorted(smooshed)))
 
     # Data access methods.
 
@@ -1410,7 +1394,7 @@ class Resource(object):
 
         try:
             serialized = self.serialize(request, errors, desired_format)
-        except BadRequest, e:
+        except BadRequest as e:
             error = "Additional errors occurred, but serialization of those errors failed."
 
             if settings.DEBUG:
@@ -1582,7 +1566,7 @@ class Resource(object):
         If ``Meta.always_return_data = True``, there will be a populated body
         of serialized data.
         """
-        deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        deserialized = self.deserialize(request, request.body, format=request.META.get('CONTENT_TYPE', 'application/json'))
         deserialized = self.alter_deserialized_detail_data(request, deserialized)
         bundle = self.build_bundle(data=dict_strip_unicode_keys(deserialized), request=request)
 
@@ -1619,10 +1603,10 @@ class Resource(object):
         Return ``HttpNoContent`` (204 No Content) if
         ``Meta.always_return_data = False`` (default).
 
-        Return ``HttpAccepted`` (202 Accepted) if
+        Return ``HttpAccepted`` (200 OK) if
         ``Meta.always_return_data = True``.
         """
-        deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        deserialized = self.deserialize(request, request.body, format=request.META.get('CONTENT_TYPE', 'application/json'))
         deserialized = self.alter_deserialized_list_data(request, deserialized)
 
         if not self._meta.collection_name in deserialized:
@@ -1648,7 +1632,7 @@ class Resource(object):
             return  self._meta.response_router_obj[request].get_no_content_response()
         else:
             to_be_serialized = {}
-            to_be_serialized[self._meta.collection_name] = [self.full_dehydrate(bundle) for bundle in bundles_seen]
+            to_be_serialized[self._meta.collection_name] = [self.full_dehydrate(bundle, for_list=True) for bundle in bundles_seen]
             to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
             response_class =  self._meta.response_router_obj[request].get_accepted_response_class()
             return self.create_response(request, to_be_serialized, response_class=response_class)
@@ -1669,10 +1653,10 @@ class Resource(object):
         ``Meta.always_return_data = False`` (default), return ``HttpNoContent``
         (204 No Content).
         If an existing resource is modified and
-        ``Meta.always_return_data = True``, return ``HttpAccepted`` (202
-        Accepted).
+        ``Meta.always_return_data = True``, return ``HttpAccepted`` (200
+        OK).
         """
-        deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        deserialized = self.deserialize(request, request.body, format=request.META.get('CONTENT_TYPE', 'application/json'))
         deserialized = self.alter_deserialized_detail_data(request, deserialized)
         bundle = self.build_bundle(data=dict_strip_unicode_keys(deserialized), request=request)
 
@@ -1784,7 +1768,7 @@ class Resource(object):
         other than ``objects`` (default).
         """
         request = convert_post_to_patch(request)
-        deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        deserialized = self.deserialize(request, request.body, format=request.META.get('CONTENT_TYPE', 'application/json'))
 
         collection_name = self._meta.collection_name
         deleted_collection_name = 'deleted_%s' % collection_name
@@ -1830,7 +1814,7 @@ class Resource(object):
 
                     # The object does exist, so this is an update-in-place.
                     bundle = self.build_bundle(obj=obj, request=request)
-                    bundle = self.full_dehydrate(bundle)
+                    bundle = self.full_dehydrate(bundle, for_list=True)
                     bundle = self.alter_detail_data_to_serialize(request, bundle)
                     self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
                     self.is_valid(bundle)
@@ -1859,7 +1843,7 @@ class Resource(object):
             return response_class()
         else:
             to_be_serialized = {}
-            to_be_serialized['objects'] = [self.full_dehydrate(bundle,for_list=True) for bundle in bundles_seen]
+            to_be_serialized['objects'] = [self.full_dehydrate(bundle, for_list=True) for bundle in bundles_seen]
             to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
             return self.create_response(request, to_be_serialized, response_class=response_class)
 
@@ -1893,7 +1877,7 @@ class Resource(object):
         bundle = self.alter_detail_data_to_serialize(request, bundle)
 
         # Now update the bundle in-place.
-        deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        deserialized = self.deserialize(request, request.body, format=request.META.get('CONTENT_TYPE', 'application/json'))
         self.update_in_place(request, bundle, deserialized)
 
         if not self._meta.always_return_data:
@@ -1975,7 +1959,7 @@ class Resource(object):
             try:
                 obj = self.obj_get(bundle=base_bundle, _optimize_query=True, **{self._meta.detail_uri_name: identifier})
                 bundle = self.build_bundle(obj=obj, request=request)
-                bundle = self.full_dehydrate(bundle)
+                bundle = self.full_dehydrate(bundle, for_list=True)
                 objects.append(bundle)
             except (ObjectDoesNotExist, Unauthorized):
                 not_found.append(identifier)
@@ -2001,7 +1985,7 @@ class ModelDeclarativeMetaclass(DeclarativeMetaclass):
         new_class = super(ModelDeclarativeMetaclass, cls).__new__(cls, name, bases, attrs)
         include_fields = getattr(new_class._meta, 'fields', [])
         excludes = getattr(new_class._meta, 'excludes', [])
-        field_names = new_class.base_fields.keys()
+        field_names = list(new_class.base_fields.keys())
 
         for field_name in field_names:
             if field_name == 'resource_uri':
@@ -2025,7 +2009,7 @@ class ModelDeclarativeMetaclass(DeclarativeMetaclass):
         return new_class
 
 
-class ModelResource(Resource):
+class BaseModelResource(Resource):
     """
     A subclass of ``Resource`` designed to work with Django's ``Models``.
 
@@ -2035,8 +2019,6 @@ class ModelResource(Resource):
     Given that it is aware of Django's ORM, it also handles the CRUD data
     operations of the resource.
     """
-    __metaclass__ = ModelDeclarativeMetaclass
-
     @classmethod
     def should_skip_field(cls, field):
         """
@@ -2243,19 +2225,9 @@ class ModelResource(Resource):
 
         if getattr(self._meta, 'queryset', None) is not None:
             # Get the possible query terms from the current QuerySet.
-            if hasattr(self._meta.queryset.query.query_terms, 'keys'):
-                # Django 1.4 & below compatibility.
-                query_terms = self._meta.queryset.query.query_terms.keys()
-            else:
-                # Django 1.5+.
-                query_terms = self._meta.queryset.query.query_terms
+            query_terms = self._meta.queryset.query.query_terms
         else:
-            if hasattr(QUERY_TERMS, 'keys'):
-                # Django 1.4 & below compatibility.
-                query_terms = QUERY_TERMS.keys()
-            else:
-                # Django 1.5+.
-                query_terms = QUERY_TERMS
+            query_terms = QUERY_TERMS
 
         for filter_expr, value in filters.items():
             filter_bits = filter_expr.split(LOOKUP_SEP)
@@ -2478,6 +2450,7 @@ class ModelResource(Resource):
         self.is_authorized("create_detail", self.get_object_list(bundle.request), bundle)
         bundle = self.preprocess('create_detail', bundle)
         self.validate_to_one_subresource(bundle)
+
         bundle = self.full_hydrate(bundle)
         bundle = self.save(bundle)
         self.fire_event('detail_created', args=(self.get_object_list(bundle.request), bundle))
@@ -2606,7 +2579,7 @@ class ModelResource(Resource):
         Necessary because PATCH should be atomic (all-success or all-fail)
         and the only way to do this neatly is at the database level.
         """
-        return super(ModelResource, self).patch_list(request, **kwargs)
+        return super(BaseModelResource, self).patch_list(request, **kwargs)
 
     def rollback(self, bundles):
         """
@@ -2629,8 +2602,9 @@ class ModelResource(Resource):
         for field_name, field_object in self.fields.items():
             if field_object.readonly:
                 continue
-
-            if bundle.data[field_name] != bundle.original_data[field_name] and field_object.change_handler:
+            
+            if field_name in bundle.original_data and \
+                    bundle.data[field_name] != bundle.original_data[field_name] and field_object.change_handler:
                 field_object.change_handler(bundle, bundle.data[field_name],
                                             bundle.original_data[field_name])
 
@@ -2700,7 +2674,7 @@ class ModelResource(Resource):
             try:
                 related_obj = getattr(bundle.obj, field_object.attribute)
             except ObjectDoesNotExist:
-                related_obj = None
+                related_obj = bundle.related_objects_to_save.get(field_object.attribute, None)
 
             # Because sometimes it's ``None`` & that's OK.
             if related_obj:
@@ -2758,7 +2732,7 @@ class ModelResource(Resource):
             # Get the manager.
             related_mngr = None
 
-            if isinstance(field_object.attribute, basestring):
+            if isinstance(field_object.attribute, six.string_types):
                 related_mngr = getattr(bundle.obj, field_object.attribute)
             elif callable(field_object.attribute):
                 related_mngr = field_object.attribute(bundle)
@@ -2793,7 +2767,10 @@ class ModelResource(Resource):
                     request=bundle.request,
                     objects_saved=bundle.objects_saved
                 )
-                related_resource.save(updated_related_bundle)
+
+                #Only save related models if they're newly added.
+                if updated_related_bundle.obj._state.adding:
+                    related_resource.save(updated_related_bundle)
                 related_objs.append(updated_related_bundle.obj)
 
             related_mngr.add(*related_objs)
@@ -2814,6 +2791,10 @@ class ModelResource(Resource):
             kwargs[self._meta.detail_uri_name] = getattr(bundle_or_obj, self._meta.detail_uri_name)
 
         return kwargs
+
+
+class ModelResource(six.with_metaclass(ModelDeclarativeMetaclass, BaseModelResource)):
+    pass
 
 
 class NamespacedModelResource(ModelResource):

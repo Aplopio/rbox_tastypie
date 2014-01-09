@@ -9,31 +9,31 @@ django-tastypie
 
 Creating delicious APIs for Django apps since 2010.
 
-Currently in beta (v0.9.13) but being used actively in production on several
+Currently in beta (v0.11.1-dev) but being used actively in production on several
 sites.
 
 
 Requirements
 ============
 
-Required
---------
+Core
+----
 
-* Python 2.6+
-* Django 1.3+
-* mimeparse 0.1.3+ (http://code.google.com/p/mimeparse/)
+* Python 2.6+ or Python 3.3+
+* Django 1.5+
+* dateutil (http://labix.org/python-dateutil) >= 2.1
 
-  * Older versions will work, but their behavior on JSON/JSONP is a touch wonky.
+Format Support
+--------------
 
-* dateutil (http://labix.org/python-dateutil) >= 1.5, < 2.0
+* XML: lxml 3 (http://lxml.de/) and defusedxml (https://pypi.python.org/pypi/defusedxml)
+* YAML: pyyaml (http://pyyaml.org/)
+* binary plist: biplist (http://explorapp.com/biplist/)
 
 Optional
 --------
 
-* python_digest (https://bitbucket.org/akoha/python-digest/)
-* lxml (http://lxml.de/) if using the XML serializer
-* pyyaml (http://pyyaml.org/) if using the YAML serializer
-* biplist (http://explorapp.com/biplist/) if using the binary plist serializer
+* HTTP Digest authentication: python3-digest (https://bitbucket.org/akoha/python-digest/)
 
 
 What's It Look Like?
@@ -103,18 +103,17 @@ Reference Material
 * http://jacobian.org/writing/rest-worst-practices/
 
 
-Commercial Support
-==================
+Security
+========
 
-If you're using Tastypie in a commercial environment, paid support is available
-from `Toast Driven`_. Services offered include:
+Tastypie is committed to providing a flexible and secure API, and was designed
+with many security features and options in mind. Due to the complex nature of
+APIs and the constant discovery of new attack vectors and vulnerabilities,
+no software is immune to security holes. We rely on our community to report
+and help us investigate security issues.
 
-* Advice/help with setup
-* Implementation in your project
-* Bugfixes in Tastypie itself
-* Features in Tastypie itself
+If you come across a security hole **please do not open a Github issue**.
+Instead, **drop us an email** at ``tastypie-security@googlegroups.com``
 
-If you're interested, please contact Daniel Lindsley (daniel@toastdriven.com).
-
-.. _`Toast Driven`: http://toastdriven.com/
->>>>>>> 2b13147715347d8239bbe73943be0eae65c8a43b
+We'll then work together to investigate and resolve the problem so we can
+announce a solution along with the vulnerability.

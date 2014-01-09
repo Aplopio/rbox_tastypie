@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 from django.http import HttpRequest
 
 
@@ -17,6 +18,7 @@ class Bundle(object):
                  related_obj=None,
                  related_name=None,
                  objects_saved=None,
+                 related_objects_to_save=None,
                  parent_obj=None,
                  parent_resource=None,
                  resource=None):
@@ -30,6 +32,7 @@ class Bundle(object):
         self.parent_obj = parent_obj
         self.parent_resource = parent_resource
         self.resource = resource
+        self.related_objects_to_save = related_objects_to_save or {}
 
     def __repr__(self):
         return "<Bundle for obj: '%s' and with data: '%s'>" % (self.obj, self.data)

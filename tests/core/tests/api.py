@@ -4,6 +4,7 @@ from django.test import TestCase
 from tastypie.api import Api
 from tastypie.exceptions import NotRegistered, BadRequest
 from tastypie.resources import Resource, ModelResource
+from tastypie.serializers import Serializer
 from core.models import Note
 
 
@@ -127,7 +128,7 @@ class ApiTestCase(TestCase):
 
         resp = api.top_level(request)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.content, '{"notes": {"list_endpoint": "/api/v1/notes/", "schema": "/api/v1/notes/schema/"}, "users": {"list_endpoint": "/api/v1/users/", "schema": "/api/v1/users/schema/"}}')
+        self.assertEqual(resp.content.decode('utf-8'), '{"notes": {"list_endpoint": "/api/v1/notes/", "schema": "/api/v1/notes/schema/"}, "users": {"list_endpoint": "/api/v1/users/", "schema": "/api/v1/users/schema/"}}')
 
     def test_top_level_jsonp(self):
         api = Api()
@@ -140,7 +141,7 @@ class ApiTestCase(TestCase):
         resp = api.top_level(request)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp['content-type'].split(';')[0], 'text/javascript')
-        self.assertEqual(resp.content, 'foo({"notes": {"list_endpoint": "/api/v1/notes/", "schema": "/api/v1/notes/schema/"}, "users": {"list_endpoint": "/api/v1/users/", "schema": "/api/v1/users/schema/"}})')
+        self.assertEqual(resp.content.decode('utf-8'), 'foo({"notes": {"list_endpoint": "/api/v1/notes/", "schema": "/api/v1/notes/schema/"}, "users": {"list_endpoint": "/api/v1/users/", "schema": "/api/v1/users/schema/"}})')
 
         request = HttpRequest()
         request.META = {'HTTP_ACCEPT': 'text/javascript'}
@@ -153,3 +154,30 @@ class ApiTestCase(TestCase):
             # Regression: We expect this, which is fine, but this used to
             #             be an import error.
             pass
+
+    def test_custom_api_serializer(self):
+        """Confirm that an Api can use a custom serializer"""
+
+        # Origin: https://github.com/toastdriven/django-tastypie/pull/817
+
+        class JSONSerializer(Serializer):
+            formats = ('json', )
+
+        api = Api(serializer_class=JSONSerializer)
+        api.register(NoteResource())
+
+        request = HttpRequest()
+        request.META = {'HTTP_ACCEPT': 'text/javascript'}
+
+        resp = api.top_level(request)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['content-type'], 'application/json',
+                         msg="Expected application/json response but received %s" % resp['content-type'])
+
+        request = HttpRequest()
+        request.META = {'HTTP_ACCEPT': 'application/xml'}
+
+        resp = api.top_level(request)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['content-type'], 'application/json',
+                         msg="Expected application/json response but received %s" % resp['content-type'])

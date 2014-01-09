@@ -1,6 +1,14 @@
+from __future__ import unicode_literals
+
 from django.conf import settings
+from django.utils import six
+
 from tastypie.exceptions import BadRequest
-from urllib import urlencode
+
+try:
+    from urllib.parse import urlencode
+except ImportError:
+    from urllib import urlencode
 
 
 class Paginator(object):
@@ -81,7 +89,7 @@ class Paginator(object):
         """
         Determines the proper starting offset of results to return.
 
-        It attempst to use the user-provided ``offset`` from the GET parameters,
+        It attempts to use the user-provided ``offset`` from the GET parameters,
         if specified. Otherwise, it falls back to the object-level ``offset``.
 
         Default is 0.
@@ -157,7 +165,7 @@ class Paginator(object):
             request_params = {}
 
             for k, v in self.request_data.items():
-                if isinstance(v, unicode):
+                if isinstance(v, six.text_type):
                     request_params[k] = v.encode('utf-8')
                 else:
                     request_params[k] = v

@@ -15,3 +15,4 @@ tests/tastypie.db
 local_settings.py
 .emacs*
 env
+env3

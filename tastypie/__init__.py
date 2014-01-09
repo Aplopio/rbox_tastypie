@@ -1,6 +1,9 @@
-__author__ = 'Daniel Lindsley, Cody Soyland, Matt Croydon, Josh Bohde & Issac Kelly'
+from __future__ import unicode_literals
 
-__version__ = (0, 9, 13, 'beta')
+
+__author__ = 'Daniel Lindsley & the Tastypie core team'
+__version__ = (0, 11, 1, 'dev')
+
 from django.core.handlers.wsgi import WSGIRequest
 from response_dispatcher import HttpResponseDispatcher
 from response_router import ResponseRouter

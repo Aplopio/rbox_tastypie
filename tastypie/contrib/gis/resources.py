@@ -1,11 +1,12 @@
 # See COPYING file in this directory.
 # Some code originally from django-boundaryservice
-
+from __future__ import unicode_literals
 from urllib import unquote
 
 from django.contrib.gis.db.models import GeometryField
-from django.utils import simplejson
 from django.contrib.gis.geos import GEOSGeometry
+
+import json
 
 from tastypie.fields import ApiField, CharField
 from tastypie import resources
@@ -23,9 +24,9 @@ class GeometryApiField(ApiField):
         value = super(GeometryApiField, self).hydrate(bundle)
         if value is None:
             return value
-        return simplejson.dumps(value)
+        return json.dumps(value)
 
-    def dehydrate(self, obj):
+    def dehydrate(self, obj, for_list=False):
         return self.convert(super(GeometryApiField, self).dehydrate(obj))
 
     def convert(self, value):
@@ -38,7 +39,7 @@ class GeometryApiField(ApiField):
         # Get ready-made geojson serialization and then convert it _back_ to
         # a Python object so that tastypie can serialize it as part of the
         # bundle.
-        return simplejson.loads(value.geojson)
+        return json.loads(value.geojson)
 
 
 class ModelResource(resources.ModelResource):

@@ -4,6 +4,35 @@
 Tastypie Cookbook
 =================
 
+Creating a Full OAuth 2.0 API
+-----------------------------
+
+It is common to use django to provision OAuth 2.0 tokens for users and then
+have Tasty Pie use these tokens to authenticate users to the API. `Follow this tutorial <http://ianalexandr.com/blog/building-a-true-oauth-20-api-with-django-and-tasty-pie.html>`_ and `use this custom authentication class <https://github.com/ianalexander/django-oauth2-tastypie>`_ to enable
+OAuth 2.0 authentication with Tasty Pie.::
+
+    # api.py
+    from tastypie.resources import ModelResource
+    from tastypie.authorization import DjangoAuthorization
+    from polls.models import Poll, Choice
+    from tastypie import fields
+    from authentication import OAuth20Authentication
+
+    class ChoiceResource(ModelResource):
+        class Meta:
+            queryset = Choice.objects.all()
+            resource_name = 'choice'
+            authorization = DjangoAuthorization()
+            authentication = OAuth20Authentication()
+
+    class PollResource(ModelResource):
+        choices = fields.ToManyField(ChoiceResource, 'choice_set', full=True)
+        class Meta:
+            queryset = Poll.objects.all()
+            resource_name = 'poll'
+            authorization = DjangoAuthorization()
+            authentication = OAuth20Authentication()
+            
 
 Adding Custom Values
 --------------------
@@ -64,6 +93,32 @@ Javascript's use, you could do the following::
             "user_json": ur.serialize(None, ur.full_dehydrate(ur_bundle), 'application/json'),
         })
 
+Example of getting a list of users::
+
+    def user_list(request):
+        res = UserResource()
+        request_bundle = res.build_bundle(request=request)
+        queryset = res.obj_get_list(request_bundle)
+
+        bundles = []
+        for obj in queryset:
+            bundle = res.build_bundle(obj=obj, request=request)
+            bundles.append(res.full_dehydrate(bundle, for_list=True))
+
+        list_json = res.serialize(None, bundles, "application/json")
+
+        return render_to_response('myapp/user_list.html', {
+            # Other things here.
+            "list_json": list_json,
+        })
+
+Then in template you could convert JSON into JavaScript object::
+
+    <script>
+        var json = "{{list_json|escapejs}}";
+        var users = JSON.parse(json);
+    </script>
+
 
 Using Non-PK Data For Your URLs
 -------------------------------
@@ -80,6 +135,7 @@ something like the following::
     class UserResource(ModelResource):
         class Meta:
             queryset = User.objects.all()
+            detail_uri_name = 'username'
 
         def prepend_urls(self):
             return [
@@ -107,7 +163,8 @@ handle the children::
 
         def get_children(self, request, **kwargs):
             try:
-                obj = self.cached_obj_get(request=request, **self.remove_api_resource_names(kwargs))
+                bundle = self.build_bundle(data={'pk': kwargs['pk']}, request=request)
+                obj = self.cached_obj_get(bundle=bundle, **self.remove_api_resource_names(kwargs))
             except ObjectDoesNotExist:
                 return HttpGone()
             except MultipleObjectsReturned:
@@ -224,8 +281,8 @@ resulting code will look something like::
             authentication = ApiKeyAuthentication()
             authorization = Authorization()
 
-        def obj_create(self, bundle, request=None, **kwargs):
-            return super(EnvironmentResource, self).obj_create(bundle, request, user=request.user)
+        def obj_create(self, bundle, **kwargs):
+            return super(EnvironmentResource, self).obj_create(bundle, user=bundle.request.user)
 
         def apply_authorization_limits(self, request, object_list):
             return object_list.filter(user=request.user)
@@ -239,6 +296,9 @@ code in Javascript. You can create a custom serializer that emits
 values in camelCase instead::
 
     from tastypie.serializers import Serializer
+
+    import re
+    import json
 
     class CamelCaseJSONSerializer(Serializer):
         formats = ['json']
@@ -268,11 +328,11 @@ values in camelCase instead::
 
             camelized_data = camelize(data)
 
-            return simplejson.dumps(camelized_data, sort_keys=True)
+            return json.dumps(camelized_data, sort_keys=True)
 
         def from_json(self, content):
             # Changes camelCase names to underscore_separated names to go from javascript convention to python convention
-            data = simplejson.loads(content)
+            data = json.loads(content)
 
             def camelToUnderscore(match):
                 return match.group()[0] + "_" + match.group()[1].lower()
@@ -290,9 +350,9 @@ values in camelCase instead::
                     return data
                 return data
 
-        underscored_data = underscorize(data)
+            underscored_data = underscorize(data)
 
-        return underscored_data
+            return underscored_data
 
 Pretty-printed JSON Serialization
 ---------------------------------
@@ -301,8 +361,8 @@ By default, Tastypie outputs JSON with no indentation or newlines (equivalent to
 :py:func:`json.dumps` with *indent* set to ``None``). You can override this
 behavior in a custom serializer::
 
-    from django.core.serializers import json
-    from django.utils import simplejson
+    import json
+    from django.core.serializers.json import DjangoJSONEncoder
     from tastypie.serializers import Serializer
 
     class PrettyJSONSerializer(Serializer):
@@ -311,7 +371,7 @@ behavior in a custom serializer::
         def to_json(self, data, options=None):
             options = options or {}
             data = self.to_simple(data, options)
-            return simplejson.dumps(data, cls=json.DjangoJSONEncoder,
+            return json.dumps(data, cls=DjangoJSONEncoder,
                     sort_keys=True, ensure_ascii=False, indent=self.json_indent)
 
 Determining format via URL
