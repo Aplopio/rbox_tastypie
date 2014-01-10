@@ -339,9 +339,6 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
         # Send the signal so other apps are aware of the exception.
         got_request_exception.send(self.__class__, request=request)
-
-        # Send the signal so other apps are aware of the exception.
-        got_request_exception.send(self.__class__, request=request)
         
         # Prep the data going out.
         data = {
