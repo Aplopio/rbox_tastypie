@@ -1814,7 +1814,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
                     # The object does exist, so this is an update-in-place.
                     bundle = self.build_bundle(obj=obj, request=request)
-                    bundle = self.full_dehydrate(bundle, for_list=True)
+                    bundle = self.full_dehydrate(bundle, for_list=False)
                     bundle = self.alter_detail_data_to_serialize(request, bundle)
                     self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
                     self.is_valid(bundle)
