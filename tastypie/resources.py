@@ -1055,7 +1055,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
             # Check for an optional method to do further hydration.
             method = getattr(self, "hydrate_%s" % field_name, None)
-
+            
             if method:
                 bundle = method(bundle)
 
@@ -1107,11 +1107,17 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         """
         Populate the ManyToMany data on the instance.
         """
+        
         if bundle.obj is None:
             raise HydrationError("You must call 'full_hydrate' before attempting to run 'hydrate_m2m' on %r." % self)
 
         for field_name, field_object in self.fields.items():
             if not getattr(field_object, 'is_m2m', False):
+                continue
+
+            if isinstance(field_object, fields.BaseSubResourceField) and\
+                    bundle.obj.id:
+                #no hydraiton for subresources for edit
                 continue
 
             if field_object.attribute:
@@ -1127,6 +1133,10 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             if not getattr(field_object, 'is_m2m', False):
                 continue
 
+            if isinstance(field_object, fields.BaseSubResourceField) and\
+                    bundle.obj.id:
+                    #no hydraiton for subresources for edit
+                continue
             method = getattr(self, "hydrate_%s" % field_name, None)
 
             if method:
@@ -1427,22 +1437,18 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             if isinstance(value, Bundle):
                 return value
             else:
-                data = bundle.data.get(field_name,{})
+                data = value 
                 if isinstance(data, basestring):
                     #happens incase of a toonefield
                     data = {'resource_uri':data}
                 return related_resource.build_bundle(obj=None, data=data,
                     request=bundle.request)
 
-
         errors = self._meta.validation.is_valid(bundle, bundle.request) or {}
 
         for field_name, field_object in self.fields.items():
-
             if not getattr(field_object, 'is_related', False):
-                continue
-
-            if getattr(field_object, 'is_m2m', False):
+                #if its not a to one field or a m2m field or a subresource
                 continue
 
             if field_object.readonly:
@@ -1453,10 +1459,18 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
             if field_object.blank and (not bundle.data.has_key(field_name) or bundle.data.get(field_name) is None):
                 continue
-
-            related_resource = field_object.get_related_resource(bundle.obj)
+            
+            
+            related_resource = field_object.get_related_resource(bundle.obj, bundle)
             if not related_resource._meta.create_on_related_fields:
                 continue
+            
+            if isinstance(field_object, fields.BaseSubResourceField) and\
+                    bundle.obj.id:
+                #no validation for subresources for edit
+                continue
+
+
             if getattr(field_object, 'is_m2m', False):
                 for data in bundle.data.get(field_name,[]):
                     related_bundle = get_related_bundle(related_resource, data, bundle)
@@ -1464,6 +1478,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                     if not related_bundle_valid:
                         errors.get(field_name,[]).append(related_bundle.errors)
             else:
+                #m2m field
                 related_bundle = get_related_bundle(related_resource, bundle.data.get(field_name,{}), bundle)
                 related_bundle_valid = related_resource.is_valid(related_bundle)
                 if not related_bundle_valid:
@@ -2444,6 +2459,7 @@ class BaseModelResource(Resource):
         for key, value in kwargs.items():
             setattr(bundle.obj, key, value)
 
+
         self.is_authorized("create_detail", self.get_object_list(bundle.request), bundle)
         bundle = self.preprocess('create_detail', bundle)
         self.validate_to_one_subresource(bundle)
@@ -2510,7 +2526,6 @@ class BaseModelResource(Resource):
                 bundle.obj = self.obj_get(bundle=bundle, _optimize_query=True, **lookup_kwargs)
             except ObjectDoesNotExist:
                 raise NotFound("A model instance matching the provided arguments could not be found.")
-
         bundle = self.preprocess('update_detail', bundle)
         bundle = self.full_hydrate(bundle)
         self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
@@ -2723,6 +2738,12 @@ class BaseModelResource(Resource):
 
             if field_object.readonly:
                 continue
+
+            #no saving on edit for subresources
+            if isinstance(field_object, fields.BaseSubResourceField) and\
+                    bundle.obj.id:
+                continue
+
             field_object.save(bundle)
 
             '''
