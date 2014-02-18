@@ -764,6 +764,7 @@ class RelatedField(ApiField):
         Accepts either a URI, a data dictionary (or dictionary-like structure)
         or an object with a ``pk``.
         """
+
         self.fk_resource = self.get_related_resource(related_obj, orig_bundle)
         kwargs = {
             'request': request,
@@ -1163,8 +1164,12 @@ class BaseSubResourceField(object):
 
 class ToOneSubResourceField(BaseSubResourceField, ToOneField):
     def __init__(self, *args, **kwargs):
-        kwargs['readonly'] = True
+        kwargs['readonly'] = kwargs.get('readonly', True)
         super(ToOneSubResourceField, self).__init__(*args, **kwargs)
+
+    @property
+    def formfield(self):
+        return AllowEverythingChoiceField
 
     def build_schema(self, **kwargs):
         field_schema = super(ToOneSubResourceField, self).build_schema(**kwargs)
@@ -1190,10 +1195,16 @@ class ToOneSubResourceField(BaseSubResourceField, ToOneField):
 
 class ToManySubResourceField(BaseSubResourceField, ToManyField):
     def __init__(self, *args, **kwargs):
-        kwargs['readonly'] = True
+        kwargs['readonly'] = kwargs.get('readonly', True)
         if not 'related_name' in kwargs:
             raise TypeError('Please specify a related name')
         super(ToManySubResourceField, self).__init__(*args, **kwargs)
+
+    @property
+    def formfield(self):
+        return AllowEverythingMultipleChoiceField
+
+
 
     def build_schema(self, **kwargs):
         field_schema = super(ToManySubResourceField, self).build_schema(**kwargs)
