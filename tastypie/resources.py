@@ -339,7 +339,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
         # Send the signal so other apps are aware of the exception.
         got_request_exception.send(self.__class__, request=request)
-        
+
         # Prep the data going out.
         data = {
             "error_message":getattr(settings, 'TASTYPIE_CANNED_ERROR', "Sorry, this request could not be processed. Please try again later."),
@@ -1055,7 +1055,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
             # Check for an optional method to do further hydration.
             method = getattr(self, "hydrate_%s" % field_name, None)
-            
+
             if method:
                 bundle = method(bundle)
 
@@ -1107,7 +1107,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         """
         Populate the ManyToMany data on the instance.
         """
-        
+
         if bundle.obj is None:
             raise HydrationError("You must call 'full_hydrate' before attempting to run 'hydrate_m2m' on %r." % self)
 
@@ -1437,7 +1437,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             if isinstance(value, Bundle):
                 return value
             else:
-                data = value 
+                data = value
                 if isinstance(data, basestring):
                     #happens incase of a toonefield
                     data = {'resource_uri':data}
@@ -1459,12 +1459,12 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
             if field_object.blank and (not bundle.data.has_key(field_name) or bundle.data.get(field_name) is None):
                 continue
-            
-            
+
+
             related_resource = field_object.get_related_resource(bundle.obj, bundle)
             if not related_resource._meta.create_on_related_fields:
                 continue
-            
+
             if isinstance(field_object, fields.BaseSubResourceField) and\
                     bundle.obj.id:
                 #no validation for subresources for edit
@@ -2614,12 +2614,21 @@ class BaseModelResource(Resource):
         for field_name, field_object in self.fields.items():
             if field_object.readonly:
                 continue
-            
+
             if field_name in bundle.original_data and \
                     bundle.data[field_name] != bundle.original_data[field_name] and field_object.change_handler:
                 field_object.change_handler(bundle, bundle.data[field_name],
                                             bundle.original_data[field_name])
 
+    def save_obj(self, bundle):
+        # Save FKs just in case.
+        self.save_related(bundle)
+        # Save the main object.
+        bundle.obj.save()
+        # Now pick up the M2M bits.
+        # RK: M2M hydrate already done in hydrate.
+        self.save_m2m(bundle)
+        return bundle
 
     def save(self, bundle, skip_errors=False):
         self.is_valid(bundle)
@@ -2635,16 +2644,9 @@ class BaseModelResource(Resource):
             self.is_authorized("create_detail", self.get_object_list(bundle.request), bundle)
             obj_update = False
 
-        # Save FKs just in case.
-        self.save_related(bundle)
-
-        # Save the main object.
-        bundle.obj.save()
+        bundle = self.save_obj(bundle)
         bundle.objects_saved.add(self.create_identifier(bundle.obj))
 
-        # Now pick up the M2M bits.
-        # RK: M2M hydrate already done in hydrate.
-        self.save_m2m(bundle)
 
         if obj_update and hasattr(bundle, 'original_data'):
             self.trigger_field_changes(bundle)
