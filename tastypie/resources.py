@@ -677,13 +677,13 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         allows = ','.join([meth.upper() for meth in allowed])
 
         if request_method == "options":
-            response_class = self.get_default_response_class(request)
+            response_class = self._meta.response_router_obj[request].get_default_response_class(request)
             response = response_class(allows)
             response['Allow'] = allows
             raise ImmediateResponse(response=response)
 
         if not request_method in allowed:
-            response =  self._meta.response_router_obj[request].get_method_notallowed_response(allows)
+            response = self._meta.response_router_obj[request].get_method_notallowed_response(allows)
             response['Allow'] = allows
             raise ImmediateResponse(response=response)
 
