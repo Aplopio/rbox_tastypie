@@ -700,13 +700,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         # Authenticate the request as needed.
         auth_result = self._meta.authentication.is_authenticated(request)
         if not auth_result is True:
-            response_class = self._meta.response_router_obj[request].\
-                get_unauthorized_response_class()
-            errors = {"error_type": "not_authenticated"}
-            response = self.error_response(
-                request, errors, response_class=response_class)
-            raise ImmediateResponse(response)
-
+            raise ImmediateResponse(self._meta.response_router_obj[request].get_unauthorized_request_response())
 
     def throttle_check(self, request):
         """
