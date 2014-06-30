@@ -1829,6 +1829,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                     bundle = self.full_dehydrate(bundle, for_list=False)
                     bundle = self.alter_detail_data_to_serialize(request, bundle)
                     self.authorized_update_detail(self.get_object_list(bundle.request), bundle)
+                    bundle.new_data = data
                     self.is_valid(bundle)
                     to_be_updated.append((request, bundle, data))
                 except ObjectDoesNotExist:
