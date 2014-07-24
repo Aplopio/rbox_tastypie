@@ -2863,11 +2863,6 @@ def convert_post_to_patch(request):
 #Base Resource for mongo-db
 ##
 
-db = MongoClient(
-    host=getattr(settings, "MONGODB_HOST", None),
-    port=getattr(settings, "MONGODB_PORT", None),
-    )[settings.MONGODB_LOG_DB_NAME]
-
 
 class Document(dict):
     # dictionary-like object for mongodb documents.
@@ -2888,7 +2883,7 @@ class MongoDBResource(Resource):
         """
 
         try:
-            return db[self._meta.collection]
+            return self._meta.db[self._meta.collection]
         except AttributeError:
             raise ImproperlyConfigured("Define a collection in your resource.")
 
