@@ -386,7 +386,10 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         self.throttle_check(request)
         try:
             parent_bundle = self.build_bundle(request=request)
-            parent_obj = self.obj_get(parent_bundle, **{'pk':pk})
+            parent_obj = self.obj_get(
+                parent_bundle, **{
+                    self._meta.detail_uri_name: pk
+                })
         except (ImmediateResponse) as e:
             raise e
         except Exception:
