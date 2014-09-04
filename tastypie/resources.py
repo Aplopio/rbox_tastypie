@@ -6,7 +6,7 @@ import logging
 import warnings
 
 from django.conf import settings
-from django.conf.urls.defaults import patterns, url, include
+from django.conf.urls import patterns, url, include
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured
 from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
 from django.core.signals import got_request_exception
