@@ -194,7 +194,7 @@ class Serializer(object):
                 if hasattr(self, "to_%s" % short_format):
                     desired_format = short_format
                     break
-        
+
         if desired_format is None:
             raise UnsupportedFormat("The format indicated '%s' had no available serialization method. Please check your ``formats`` and ``content_types`` on your Serializer." % format)
 
@@ -370,7 +370,7 @@ class Serializer(object):
         options = options or {}
         data = self.to_simple(data, options)
         if django.get_version() >= '1.5':
-            return djangojson.dumps(data, cls=djangojson.DjangoJSONEncoder, sort_keys=True, ensure_ascii=False)
+            return djangojson.josn.dumps(data, cls=djangojson.DjangoJSONEncoder, sort_keys=True, ensure_ascii=False)
         else:
             return json.dumps(data, cls=djangojson.DjangoJSONEncoder, sort_keys=True, ensure_ascii=False)
 
