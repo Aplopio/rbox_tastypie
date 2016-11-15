@@ -1,5 +1,5 @@
 from tastypie.exceptions import TastypieError, Unauthorized
-from django.utils import importlib
+import importlib
 
 
 class BundlePreProcessor(object):
