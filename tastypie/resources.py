@@ -6,7 +6,13 @@ import logging
 import warnings
 
 from django.conf import settings
-from django.conf.urls import url, include
+
+from tastypie.utils import IS_DJANGO_1_4
+if IS_DJANGO_1_4:
+    from django.conf.urls import url, patterns, include
+else:
+    from django.conf.urls import url, include
+
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured
 from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
 from django.core.signals import got_request_exception
@@ -70,7 +76,10 @@ class NOT_AVAILABLE:
 class CustomRegexURLResolver(RegexURLResolver):
     @property
     def url_patterns(self):
-        url_patterns = patterns("", *self.urlconf_name)
+        if IS_DJANGO_1_4:
+            url_patterns = patterns("", *self.urlconf_name)
+        else:
+            url_patterns = self.urlconf_name
         try:
             iter(url_patterns)
         except TypeError:

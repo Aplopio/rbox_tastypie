@@ -1,5 +1,11 @@
 from __future__ import unicode_literals
-from django.core.cache import caches
+
+from tastypie.utils import IS_DJANGO_1_4
+
+if IS_DJANGO_1_4:
+    from django.core.cache import get_cache
+else:
+    from django.core.cache import caches
 
 
 class NoCache(object):
@@ -59,7 +65,10 @@ class SimpleCache(NoCache):
         Defaults to ``60`` seconds.
         """
         super(SimpleCache, self).__init__(*args, **kwargs)
-        self.cache = caches[cache_name]
+        if IS_DJANGO_1_4:
+            self.cache = get_cache(cache_name)
+        else:
+            self.cache = caches[cache_name]
         self.timeout = timeout or self.cache.default_timeout
         self.public = public
         self.private = private
