@@ -55,6 +55,12 @@ from bson import ObjectId
 from pymongo import MongoClient
 from tastypie.bundle import Bundle
 
+
+try:
+    commit_on_success = transaction.atomic
+except AttributeError:
+    commit_on_success = transaction.commit_on_success
+
 try:
     set
 except NameError:
@@ -2593,7 +2599,7 @@ class BaseModelResource(Resource):
         bundle.obj.delete()
         self.fire_event('detail_deleted', args=(self.get_object_list(bundle.request), bundle))
 
-    @transaction.commit_on_success()
+    @commit_on_success()
     def patch_list(self, request, **kwargs):
         """
         An ORM-specific implementation of ``patch_list``.
