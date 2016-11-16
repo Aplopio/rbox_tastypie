@@ -4,15 +4,15 @@ from dateutil.parser import parse
 from decimal import Decimal
 import re
 from django import forms
-from django.utils.functional import memoize
 
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django import forms as djangoform
-from django.utils import datetime_safe, importlib
+from django.utils import datetime_safe
+from importlib import import_module
 from django.utils import six
 from tastypie.bundle import Bundle
-from tastypie.exceptions import ApiFieldError, NotFound, HydrationError
-from tastypie.utils import dict_strip_unicode_keys, make_aware, LimitedSizeDict
+from tastypie.exceptions import ApiFieldError, NotFound
+from tastypie.utils import dict_strip_unicode_keys, make_aware
 
 
 class NOT_PROVIDED:
@@ -634,7 +634,7 @@ class RelatedField(ApiField):
             # Try to import.
             module_bits = self.to.split('.')
             module_path, class_name = '.'.join(module_bits[:-1]), module_bits[-1]
-            module = importlib.import_module(module_path)
+            module = import_module(module_path)
         else:
             # We've got a bare class name here, which won't work (No AppCache
             # to rely on). Try to throw a useful error.

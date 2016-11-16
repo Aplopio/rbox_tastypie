@@ -6,7 +6,13 @@ import logging
 import warnings
 
 from django.conf import settings
-from django.conf.urls import patterns, url, include
+
+from tastypie.utils import IS_DJANGO_1_4
+if IS_DJANGO_1_4:
+    from django.conf.urls import url, patterns, include
+else:
+    from django.conf.urls import url, include
+
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured
 from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
 from django.core.signals import got_request_exception
@@ -49,6 +55,12 @@ from bson import ObjectId
 from pymongo import MongoClient
 from tastypie.bundle import Bundle
 
+
+try:
+    commit_on_success = transaction.atomic
+except AttributeError:
+    commit_on_success = transaction.commit_on_success
+
 try:
     set
 except NameError:
@@ -70,7 +82,10 @@ class NOT_AVAILABLE:
 class CustomRegexURLResolver(RegexURLResolver):
     @property
     def url_patterns(self):
-        url_patterns = patterns("", *self.urlconf_name)
+        if IS_DJANGO_1_4:
+            url_patterns = patterns("", *self.urlconf_name)
+        else:
+            url_patterns = self.urlconf_name
         try:
             iter(url_patterns)
         except TypeError:
@@ -480,10 +495,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
         urls += self.base_urls()
         urls += self.sub_resource_urls()
-        urlpatterns = patterns('',
-            *urls
-        )
-        return urlpatterns
+        return urls
 
     def determine_format(self, request):
         """
@@ -2587,7 +2599,7 @@ class BaseModelResource(Resource):
         bundle.obj.delete()
         self.fire_event('detail_deleted', args=(self.get_object_list(bundle.request), bundle))
 
-    @transaction.commit_on_success()
+    @commit_on_success()
     def patch_list(self, request, **kwargs):
         """
         An ORM-specific implementation of ``patch_list``.

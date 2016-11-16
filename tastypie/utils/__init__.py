@@ -5,6 +5,11 @@ from tastypie.utils.validate_jsonp import is_valid_jsonp_callback_value
 from tastypie.utils.timezone import now, make_aware, make_naive, aware_date, aware_datetime
 import inspect
 
+import django
+
+IS_DJANGO_1_4 = django.get_version().startswith('1.4')
+
+
 def get_current_func_name():
     """for python version greater than equal to 2.7"""
     return inspect.stack()[1][3]
