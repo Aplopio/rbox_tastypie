@@ -2621,7 +2621,12 @@ class BaseModelResource(Resource):
                 bundle.obj.delete()
 
     def create_identifier(self, obj):
-        return u"%s.%s.%s" % (obj._meta.app_label, obj._meta.module_name, obj.pk)
+        if IS_DJANGO_1_4:
+            return u"%s.%s.%s" % (obj._meta.app_label, obj._meta.module_name, obj.pk)
+        else:
+            return u"%s.%s.%s" % (
+                obj._meta.app_label, obj._meta.object_name.lower(), obj.pk
+            )
 
     def trigger_field_changes(self, bundle):
         '''
