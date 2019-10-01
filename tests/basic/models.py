@@ -1,3 +1,4 @@
+from builtins import object
 import datetime
 from django.contrib.auth.models import User
 from django.db import models
@@ -41,5 +42,5 @@ class SlugBasedNote(models.Model):
 
 
 class UserForm(forms.ModelForm):
-    class Meta:
+    class Meta(object):
         model = User

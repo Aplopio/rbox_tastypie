@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from builtins import str
 from django.conf import settings
 from django.test import TestCase
 from tastypie.exceptions import BadRequest

@@ -1,3 +1,4 @@
+from builtins import object
 from django.contrib.auth.models import User
 from django.http import HttpRequest
 from django.test import TestCase
@@ -9,13 +10,13 @@ from core.models import Note
 
 
 class NoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.filter(is_active=True)
 
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'users'
         queryset = User.objects.all()
 

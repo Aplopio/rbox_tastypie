@@ -1,4 +1,7 @@
 from __future__ import unicode_literals
+from builtins import str
+from past.builtins import basestring
+from builtins import object
 import datetime
 from dateutil.parser import parse
 from decimal import Decimal
@@ -15,7 +18,7 @@ from tastypie.exceptions import ApiFieldError, NotFound
 from tastypie.utils import dict_strip_unicode_keys, make_aware
 
 
-class NOT_PROVIDED:
+class NOT_PROVIDED(object):
     def __str__(self):
         return 'No default provided.'
 
@@ -584,7 +587,7 @@ class RelatedField(ApiField):
             data['fields'][field_name]['schema'] ="%s%s/schema/"%(self.get_resource_uri(),field_name)
         else:
             related_resource = field_object.get_related_resource()
-            data['fields'][field_name]['schema'] = unicode(related_resource.get_resource_uri())+ "schema/"  #unicode(.get_resource_uri()) + "schema/"
+            data['fields'][field_name]['schema'] = str(related_resource.get_resource_uri())+ "schema/"  #unicode(.get_resource_uri()) + "schema/"
 
             if related_resource._meta.include_resource_uri==False or not field_object.to_class().get_resource_uri():
                 data['fields'][field_name]['schema'] = field_object.to_class().build_schema()
@@ -723,14 +726,14 @@ class RelatedField(ApiField):
             fk_bundle.related_obj = related_obj
             fk_bundle.related_name = related_name
 
-        unique_keys = dict((k, v) for k, v in data.items() if k == 'pk' or (hasattr(fk_resource, k) and getattr(fk_resource, k).unique))
+        unique_keys = dict((k, v) for k, v in list(data.items()) if k == 'pk' or (hasattr(fk_resource, k) and getattr(fk_resource, k).unique))
 
         try:
             fk_bundle.obj =  self.get_obj_from_data(fk_resource, fk_bundle, **data)
         except (NotFound, TypeError):
             try:
                 # Attempt lookup by primary key
-                lookup_kwargs = dict((k, v) for k, v in data.iteritems()
+                lookup_kwargs = dict((k, v) for k, v in data.items()
                                      if (hasattr(fk_resource, k) and
                                          getattr(fk_resource, k).unique))
                 if not lookup_kwargs:

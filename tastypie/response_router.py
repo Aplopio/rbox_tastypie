@@ -1,3 +1,4 @@
+from builtins import object
 from tastypie.utils import get_request_class_name_lowered
 
 

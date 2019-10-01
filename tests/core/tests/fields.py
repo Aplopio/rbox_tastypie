@@ -1,3 +1,4 @@
+from builtins import object
 import datetime
 from dateutil.tz import *
 from django.db import models
@@ -594,7 +595,7 @@ class DateTimeFieldTestCase(TestCase):
 
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'users'
         queryset = User.objects.all()
 
@@ -909,7 +910,7 @@ class ToOneFieldTestCase(TestCase):
 
 
 class SubjectResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'subjects'
         queryset = Subject.objects.all()
 
@@ -921,7 +922,7 @@ class SubjectResource(ModelResource):
 
 
 class MediaBitResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'mediabits'
         queryset = MediaBit.objects.all()
 

@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from builtins import object
 import hmac
 import time
 from django.conf import settings
@@ -50,7 +51,7 @@ if 'django.contrib.auth' in settings.INSTALLED_APPS:
             # Hmac that beast.
             return hmac.new(new_uuid.bytes, digestmod=sha1).hexdigest()
 
-        class Meta:
+        class Meta(object):
             abstract = getattr(settings, 'TASTYPIE_ABSTRACT_APIKEY', False)
 
 

@@ -1,3 +1,4 @@
+from builtins import object
 try:
     from django.conf.urls import patterns, include
 except ImportError: # Django < 1.4
@@ -9,7 +10,7 @@ from core.tests.api import Api, UserResource
 
 
 class SubjectResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'subjects'
         queryset = Subject.objects.all()
 
@@ -18,7 +19,7 @@ class CustomNoteResource(ModelResource):
     author = fields.ForeignKey(UserResource, 'author')
     subjects = fields.ManyToManyField(SubjectResource, 'subjects')
     
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.all()
 

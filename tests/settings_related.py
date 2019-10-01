@@ -1,4 +1,5 @@
-from settings import *
+from __future__ import absolute_import
+from .settings import *
 INSTALLED_APPS.append('core')
 INSTALLED_APPS.append('related_resource')
 

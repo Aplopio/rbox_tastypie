@@ -1,3 +1,4 @@
+from builtins import object
 from django.contrib.auth.models import User
 from tastypie import fields
 from tastypie.resources import ModelResource
@@ -9,7 +10,7 @@ from tests.related_resource.models import Label, Post
 
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'users'
         queryset = User.objects.all()
         allowed_methods = ['get']
@@ -19,7 +20,7 @@ class UserResource(ModelResource):
 class NoteResource(ModelResource):
     author = fields.ForeignKey(UserResource, 'author')
 
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.all()
         authorization = Authorization()
@@ -28,7 +29,7 @@ class NoteResource(ModelResource):
 class CategoryResource(ModelResource):
     parent = fields.ToOneField('self', 'parent', null=True)
 
-    class Meta:
+    class Meta(object):
         resource_name = 'category'
         queryset = Category.objects.all()
         authorization = Authorization()
@@ -43,7 +44,7 @@ class TagResource(ModelResource):
             'related_resource.api.resources.ExtraDataResource', 'extradata',
             null=True, blank=True, full=True)
 
-    class Meta:
+    class Meta(object):
         resource_name = 'tag'
         queryset = Tag.objects.all()
         authorization = Authorization()
@@ -54,7 +55,7 @@ class TaggableResource(ModelResource):
             'related_resource.api.resources.TaggableTagResource', 'taggabletags',
             null=True)
 
-    class Meta:
+    class Meta(object):
         resource_name = 'taggable'
         queryset = Taggable.objects.all()
         authorization = Authorization()
@@ -68,7 +69,7 @@ class TaggableTagResource(ModelResource):
             'related_resource.api.resources.TaggableResource', 'taggable',
             null=True)
 
-    class Meta:
+    class Meta(object):
         resource_name = 'taggabletag'
         queryset = TaggableTag.objects.all()
         authorization = Authorization()
@@ -79,7 +80,7 @@ class ExtraDataResource(ModelResource):
             'related_resource.api.resources.TagResource', 'tag',
             null=True)
 
-    class Meta:
+    class Meta(object):
         resource_name = 'extradata'
         queryset = ExtraData.objects.all()
         authorization = Authorization()
@@ -88,7 +89,7 @@ class ExtraDataResource(ModelResource):
 class FreshNoteResource(ModelResource):
     media_bits = fields.ToManyField('related_resource.api.resources.FreshMediaBitResource', 'media_bits', related_name='note')
 
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
         resource_name = 'freshnote'
         authorization = Authorization()
@@ -97,14 +98,14 @@ class FreshNoteResource(ModelResource):
 class FreshMediaBitResource(ModelResource):
     note = fields.ToOneField(FreshNoteResource, 'note')
 
-    class Meta:
+    class Meta(object):
         queryset = MediaBit.objects.all()
         resource_name = 'freshmediabit'
         authorization = Authorization()
 
 
 class AddressResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = Address.objects.all()
         resource_name = 'address'
         authorization = Authorization()
@@ -113,7 +114,7 @@ class AddressResource(ModelResource):
 class ProductResource(ModelResource):
     producer = fields.ToOneField('related_resource.api.resources.CompanyResource', 'producer')
 
-    class Meta:
+    class Meta(object):
         queryset = Product.objects.all()
         resource_name = 'product'
         authorization = Authorization()
@@ -123,7 +124,7 @@ class CompanyResource(ModelResource):
     address = fields.ToOneField(AddressResource, 'address', null=True, full=True)
     products = fields.ToManyField(ProductResource, 'products', full=True, related_name='producer', null=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Company.objects.all()
         resource_name = 'company'
         authorization = Authorization()
@@ -133,14 +134,14 @@ class PersonResource(ModelResource):
     company = fields.ToOneField(CompanyResource, 'company', null=True, full=True)
     dogs = fields.ToManyField('related_resource.api.resources.DogResource', 'dogs', full=True, related_name='owner', null=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Person.objects.all()
         resource_name = 'person'
         authorization = Authorization()
 
 
 class DogHouseResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = DogHouse.objects.all()
         resource_name = 'doghouse'
         authorization = Authorization()
@@ -149,7 +150,7 @@ class DogHouseResource(ModelResource):
 class BoneResource(ModelResource):
     dog = fields.ToOneField('related_resource.api.resources.DogResource', 'dog')
 
-    class Meta:
+    class Meta(object):
         queryset = Bone.objects.all()
         resource_name = 'bone'
         authorization = Authorization()
@@ -160,13 +161,13 @@ class DogResource(ModelResource):
     house = fields.ToOneField(DogHouseResource, 'house', full=True, null=True)
     bones = fields.ToManyField(BoneResource, 'bones', full=True, null=True, related_name='dog')
 
-    class Meta:
+    class Meta(object):
         queryset = Dog.objects.all()
         resource_name = 'dog'
         authorization = Authorization()
 
 class LabelResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'label'
         queryset = Label.objects.all()
         authorization = Authorization()
@@ -175,7 +176,7 @@ class LabelResource(ModelResource):
 class PostResource(ModelResource):
     label = fields.ToManyField(LabelResource, 'label', null=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Post.objects.all()
         resource_name = 'post'
         authorization = Authorization()
@@ -183,7 +184,7 @@ class PostResource(ModelResource):
 class PaymentResource(ModelResource):
     job = fields.ToOneField('related_resource.api.resources.JobResource', 'job')
 
-    class Meta:
+    class Meta(object):
         queryset = Payment.objects.all()
         resource_name = 'payment'
         authorization = Authorization()
@@ -192,7 +193,7 @@ class PaymentResource(ModelResource):
 class JobResource(ModelResource):
     payment = fields.ToOneField(PaymentResource, 'payment', related_name='job')
 
-    class Meta:
+    class Meta(object):
         queryset = Job.objects.all()
         resource_name = 'job'
         authorization = Authorization()

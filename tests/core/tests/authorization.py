@@ -1,3 +1,4 @@
+from builtins import object
 from django.test import TestCase
 from django.http import HttpRequest
 from django.contrib.auth.models import User, Permission
@@ -9,21 +10,21 @@ from tastypie.resources import Resource, ModelResource
 
 
 class NoRulesNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.filter(is_active=True)
         authorization = Authorization()
 
 
 class ReadOnlyNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.filter(is_active=True)
         authorization = ReadOnlyAuthorization()
 
 
 class DjangoNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.filter(is_active=True)
         authorization = DjangoAuthorization()
@@ -36,7 +37,7 @@ class NotAModel(object):
 class NotAModelResource(Resource):
     name = fields.CharField(attribute='name')
 
-    class Meta:
+    class Meta(object):
         resource_name = 'notamodel'
         object_class = NotAModel
         authorization = DjangoAuthorization()

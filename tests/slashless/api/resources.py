@@ -1,3 +1,4 @@
+from builtins import object
 from django.contrib.auth.models import User
 from tastypie import fields
 from tastypie.resources import ModelResource
@@ -6,7 +7,7 @@ from basic.models import Note
 
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'users'
         queryset = User.objects.all()
         authorization = Authorization()
@@ -15,7 +16,7 @@ class UserResource(ModelResource):
 class NoteResource(ModelResource):
     user = fields.ForeignKey(UserResource, 'user')
     
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.all()
         authorization = Authorization()

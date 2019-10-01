@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import with_statement
+from past.builtins import basestring
+from builtins import object
 import simplejson
 from copy import deepcopy
 import logging
@@ -75,7 +77,7 @@ except ImportError:
 
 
 
-class NOT_AVAILABLE:
+class NOT_AVAILABLE(object):
     def __str__(self):
         return 'No such data is available.'
 
@@ -175,12 +177,12 @@ class DeclarativeMetaclass(type):
             for p in parents:
                 parent_fields = getattr(p, 'base_fields', {})
 
-                for field_name, field_object in parent_fields.items():
+                for field_name, field_object in list(parent_fields.items()):
                     attrs['base_fields'][field_name] = deepcopy(field_object)
         except NameError:
             pass
 
-        for field_name, obj in attrs.copy().items():
+        for field_name, obj in list(attrs.copy().items()):
             # Look for ``dehydrated_type`` instead of doing ``isinstance``,
             # which can break down if Tastypie is re-namespaced as something
             # else.
@@ -207,7 +209,7 @@ class DeclarativeMetaclass(type):
         elif 'resource_uri' in new_class.base_fields and not 'resource_uri' in attrs:
             del(new_class.base_fields['resource_uri'])
 
-        for field_name, field_object in new_class.base_fields.items():
+        for field_name, field_object in list(new_class.base_fields.items()):
             if hasattr(field_object, 'contribute_to_class'):
                 field_object.contribute_to_class(new_class, field_name)
 
@@ -226,7 +228,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
     data sources, such as search results, files, other data, etc.
     """
     def __init__(self, api_name=None, parent_resource=None, parent_pk=None, parent_obj=None, parent_field=None):
-        self.fields = {k: copy(v) for k, v in self.base_fields.iteritems()}
+        self.fields = {k: copy(v) for k, v in self.base_fields.items()}
         self.parent_resource=parent_resource
         self.parent_pk = parent_pk
         self.parent_obj = parent_obj
@@ -292,10 +294,10 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             except (BadRequest, fields.ApiFieldError) as e:
                 data = {"error": e.args[0] if getattr(e, 'args') else ''}
                 return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
-            except ValidationError, e:
+            except ValidationError as e:
                 data = {"error": e.messages}
                 return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
-            except Exception, e:
+            except Exception as e:
                 return self._handle_500(request, e)
 
         return wrapper
@@ -444,7 +446,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         sub_resource_field_list = []
         url_list=[]
 
-        for name, field in self.fields.items():
+        for name, field in list(self.fields.items()):
             if isinstance(field, fields.BaseSubResourceField):
                 url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>.+)/schema/"%(self._meta.resource_name,), self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
                 sub_resource_field_list.append(field)
@@ -456,7 +458,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                     self.wrap_view('view_to_handle_subresource'), {'%s_sub_resource_field_list'%(self._meta.resource_name): sub_resource_field_list}),
             ]
 
-        for name, field in self.fields.items():
+        for name, field in list(self.fields.items()):
             if isinstance(field, fields.BaseSubResourceField):
                 include_urls = include(field.get_related_resource().urls)
                 url_list += [
@@ -537,10 +539,10 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         """
         try:
             deserialized = self._meta.serializer.deserialize(data, format=request.META.get('CONTENT_TYPE', 'application/json'))
-        except UnsupportedFormat, e:
+        except UnsupportedFormat as e:
             errors = {"errors": e.message}
             raise ImmediateResponse(response=self.error_response(request, errors))
-        except ValueError, e:
+        except ValueError as e:
             errors = {"errors": "Please provide a proper JSON string!"}
             raise ImmediateResponse(response=self.error_response(request, errors))
         return deserialized
@@ -659,7 +661,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                 del(kwargs_subset[key])
             except KeyError:
                 pass
-        for key, item in url_dict.iteritems():
+        for key, item in url_dict.items():
             if 'resource_name' in key or (key !='pk' and 'pk' in key):
                 try:
                     del (kwargs_subset[key])
@@ -759,13 +761,13 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
     def is_authorized(self, action,object_list, bundle ):
         try:
             auth_result = getattr(self._meta.authorization, action)(object_list, bundle)
-        except Unauthorized, exception:
+        except Unauthorized as exception:
             response = self._meta.response_router_obj[bundle.request].get_unauthorized_request_response()
             response.content = exception.message
             raise ImmediateResponse(response=response)
 
             #self.unauthorized_result(bundle.request, e)
-        except Forbidden, exception:
+        except Forbidden as exception:
 
             response_class = self._meta.response_router_obj[bundle.request].get_forbidden_response_class()
             errors = {"error_type":exception.error_type,
@@ -1015,7 +1017,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         use_in = ['all', 'list' if for_list else 'detail']
 
         # Dehydrate each field.
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             # If it's not for use in this mode, skip
             field_use_in = getattr(field_object, 'use_in', 'all')
             if callable(field_use_in):
@@ -1064,7 +1066,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
         bundle = self.hydrate(bundle)
 
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             if field_object.readonly is True:
                 continue
 
@@ -1126,7 +1128,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         if bundle.obj is None:
             raise HydrationError("You must call 'full_hydrate' before attempting to run 'hydrate_m2m' on %r." % self)
 
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             if not getattr(field_object, 'is_m2m', False):
                 continue
 
@@ -1144,7 +1146,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                 if not (value is None and field_object.readonly):
                     bundle.data[field_name] = value
 
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             if not getattr(field_object, 'is_m2m', False):
                 continue
 
@@ -1180,7 +1182,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         if self._meta.filtering:
             data['filtering'] = self._meta.filtering
 
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             data['fields'][field_name] = field_object.build_schema(field_name=field_name,resource_uri=self.get_resource_uri(), resource=self)
         return data
 
@@ -1206,7 +1208,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         """
         smooshed = []
 
-        for key, value in kwargs.items():
+        for key, value in list(kwargs.items()):
             smooshed.append("%s=%s" % (key, value))
 
         # Use a list plus a ``.join()`` because it's faster than concatenation.
@@ -1461,7 +1463,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
         errors = self._meta.validation.is_valid(bundle, bundle.request) or {}
 
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             if not getattr(field_object, 'is_related', False):
                 #if its not a to one field or a m2m field or a subresource
                 continue
@@ -1472,7 +1474,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             if not field_object.attribute:
                 continue
 
-            if field_object.blank and (not bundle.data.has_key(field_name) or bundle.data.get(field_name) is None):
+            if field_object.blank and (field_name not in bundle.data or bundle.data.get(field_name) is None):
                 continue
 
 
@@ -1921,7 +1923,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         Update the object in original_bundle in-place using new_data.
         """
         if hasattr(original_bundle.obj,'_prefetched_objects_cache'):
-            for key in new_data.keys():
+            for key in list(new_data.keys()):
                 if key in self._meta.prefetch_related:
                     field = self.fields.get(key)
                     try:
@@ -2219,7 +2221,7 @@ class BaseModelResource(Resource):
                 else:
                     value = value.split(',')
             return value
-        except Exception, e:
+        except Exception as e:
             try:
                 logger = logging.getLogger("tastypie.resources.filter_value_to_python")
                 logger.error("filter_value_to_python - value-%s  filters-%s filter_expr-%s"%(value, filters, filter_expr))
@@ -2257,7 +2259,7 @@ class BaseModelResource(Resource):
         else:
             query_terms = QUERY_TERMS
 
-        for filter_expr, value in filters.items():
+        for filter_expr, value in list(filters.items()):
             filter_bits = filter_expr.split(LOOKUP_SEP)
             field_name = filter_bits.pop(0)
             filter_type = 'exact'
@@ -2338,7 +2340,7 @@ class BaseModelResource(Resource):
     def build_exclude(self,request,filters):
         exclude_filters = {}
         notequal = '__ne'
-        for field, val in filters.items():
+        for field, val in list(filters.items()):
             if field.endswith(notequal):
                 exclude_filters[field[:-len(notequal)]]=val
                 filters.pop(field)
@@ -2369,7 +2371,7 @@ class BaseModelResource(Resource):
                 yield curr
 
 
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             # If it's not for use in this mode, skip
             field_use_in = getattr(field_object, 'use_in', 'all')
             if callable(field_use_in):
@@ -2453,7 +2455,7 @@ class BaseModelResource(Resource):
             object_list = self.get_object_list(bundle.request).filter(**kwargs)
             if optimize_query:
                 object_list = self.optimize_query(object_list, bundle)
-            stringified_kwargs = u", ".join([u"%s=%s" % (k, v) for k, v in kwargs.items()])
+            stringified_kwargs = u", ".join([u"%s=%s" % (k, v) for k, v in list(kwargs.items())])
 
             if len(object_list) <= 0:
                 raise self._meta.object_class.DoesNotExist("Couldn't find an instance of '%s' which matched '%s'." % (self._meta.object_class.__name__, stringified_kwargs))
@@ -2472,7 +2474,7 @@ class BaseModelResource(Resource):
         """
         bundle.obj = self._meta.object_class()
 
-        for key, value in kwargs.items():
+        for key, value in list(kwargs.items()):
             setattr(bundle.obj, key, value)
 
 
@@ -2632,7 +2634,7 @@ class BaseModelResource(Resource):
         '''
         Triggers change events on fields that are listening
         '''
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             if field_object.readonly:
                 continue
 
@@ -2685,7 +2687,7 @@ class BaseModelResource(Resource):
         call ``save`` on them if they have related, non-M2M data.
         M2M data is handled by the ``ModelResource.save_m2m`` method.
         """
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             if not getattr(field_object, 'is_related', False):
                 continue
 
@@ -2700,7 +2702,7 @@ class BaseModelResource(Resource):
 
             if field_object.readonly:
                 continue
-            if field_object.blank and not bundle.data.has_key(field_name):
+            if field_object.blank and field_name not in bundle.data:
                 continue
 
             field_object.save(bundle)
@@ -2752,7 +2754,7 @@ class BaseModelResource(Resource):
         Currently slightly inefficient in that it will clear out the whole
         relation and recreate the related data as needed.
         """
-        for field_name, field_object in self.fields.items():
+        for field_name, field_object in list(self.fields.items()):
             if not getattr(field_object, 'is_m2m', False):
                 continue
 
@@ -2894,7 +2896,7 @@ class MongoDBResource(Resource):
     NOTE: alter it f using obj_create and
     """
 
-    class Meta:
+    class Meta(object):
         pass
 
     def get_collection(self):
@@ -2921,7 +2923,7 @@ class MongoDBResource(Resource):
         filters = {}
 
         if hasattr(bundle.request, 'GET'):
-            filters = dict(bundle.request.GET.copy().iteritems())
+            filters = dict(iter(bundle.request.GET.copy().items()))
         # Update with the provided kwargs.
         if "format" in filters:
             del filters['format']

@@ -1,3 +1,4 @@
+from builtins import object
 from django.contrib.auth.models import User
 from tastypie.cache import SimpleCache
 from tastypie import fields
@@ -8,14 +9,14 @@ from basic.models import Note, AnnotatedNote, SlugBasedNote
 
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'users'
         queryset = User.objects.all()
         authorization = Authorization()
 
 
 class CachedUserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         allowed_methods = ('get', )
         queryset = User.objects.all()
         resource_name = 'cached_users'
@@ -23,7 +24,7 @@ class CachedUserResource(ModelResource):
 
 
 class PublicCachedUserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         allowed_methods = ('get', )
         queryset = User.objects.all()
         resource_name = 'public_cached_users'
@@ -31,7 +32,7 @@ class PublicCachedUserResource(ModelResource):
 
 
 class PrivateCachedUserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         allowed_methods = ('get', )
         queryset = User.objects.all()
         resource_name = 'private_cached_users'
@@ -41,14 +42,14 @@ class PrivateCachedUserResource(ModelResource):
 class NoteResource(ModelResource):
     user = fields.ForeignKey(UserResource, 'user')
 
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.all()
         authorization = Authorization()
 
 
 class BustedResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = AnnotatedNote.objects.all()
         resource_name = 'busted'
 
@@ -57,7 +58,7 @@ class BustedResource(ModelResource):
 
 
 class SlugBasedNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = SlugBasedNote.objects.all()
         resource_name = 'slugbased'
         detail_uri_name = 'slug'
@@ -65,7 +66,7 @@ class SlugBasedNoteResource(ModelResource):
 
 
 class SessionUserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'sessionusers'
         queryset = User.objects.all()
         authentication = SessionAuthentication()
