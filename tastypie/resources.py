@@ -292,10 +292,10 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             except (BadRequest, fields.ApiFieldError) as e:
                 data = {"error": e.args[0] if getattr(e, 'args') else ''}
                 return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
-            except ValidationError, e:
+            except ValidationError as e:
                 data = {"error": e.messages}
                 return self.error_response(request, data, response_class=self._meta.response_router_obj[request].get_bad_request_response_class())
-            except Exception, e:
+            except Exception as e:
                 return self._handle_500(request, e)
 
         return wrapper
@@ -537,10 +537,10 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         """
         try:
             deserialized = self._meta.serializer.deserialize(data, format=request.META.get('CONTENT_TYPE', 'application/json'))
-        except UnsupportedFormat, e:
+        except UnsupportedFormat as e:
             errors = {"errors": e.message}
             raise ImmediateResponse(response=self.error_response(request, errors))
-        except ValueError, e:
+        except ValueError as e:
             errors = {"errors": "Please provide a proper JSON string!"}
             raise ImmediateResponse(response=self.error_response(request, errors))
         return deserialized
@@ -759,13 +759,13 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
     def is_authorized(self, action,object_list, bundle ):
         try:
             auth_result = getattr(self._meta.authorization, action)(object_list, bundle)
-        except Unauthorized, exception:
+        except Unauthorized as exception:
             response = self._meta.response_router_obj[bundle.request].get_unauthorized_request_response()
             response.content = exception.message
             raise ImmediateResponse(response=response)
 
             #self.unauthorized_result(bundle.request, e)
-        except Forbidden, exception:
+        except Forbidden as exception:
 
             response_class = self._meta.response_router_obj[bundle.request].get_forbidden_response_class()
             errors = {"error_type":exception.error_type,
@@ -1472,7 +1472,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             if not field_object.attribute:
                 continue
 
-            if field_object.blank and (not bundle.data.has_key(field_name) or bundle.data.get(field_name) is None):
+            if field_object.blank and (field_name not in bundle.data or bundle.data.get(field_name) is None):
                 continue
 
 
@@ -2219,7 +2219,7 @@ class BaseModelResource(Resource):
                 else:
                     value = value.split(',')
             return value
-        except Exception, e:
+        except Exception as e:
             try:
                 logger = logging.getLogger("tastypie.resources.filter_value_to_python")
                 logger.error("filter_value_to_python - value-%s  filters-%s filter_expr-%s"%(value, filters, filter_expr))
@@ -2700,7 +2700,7 @@ class BaseModelResource(Resource):
 
             if field_object.readonly:
                 continue
-            if field_object.blank and not bundle.data.has_key(field_name):
+            if field_object.blank and field_name not in bundle.data:
                 continue
 
             field_object.save(bundle)

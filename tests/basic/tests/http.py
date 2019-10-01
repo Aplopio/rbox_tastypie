@@ -1,9 +1,10 @@
+from __future__ import absolute_import
 from testcases import TestServerTestCase
 import json
 from django.utils import six
 
 try:
-    from http.client import HTTPConnection
+    from .http.client import HTTPConnection
 except ImportError:
     from httplib import HTTPConnection
 

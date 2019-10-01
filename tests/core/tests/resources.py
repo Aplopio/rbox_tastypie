@@ -700,7 +700,7 @@ class ResourceTestCase(TestCase):
         try:
             basic.method_check(request)
             self.fail("Should have thrown an exception.")
-        except ImmediateResponse, e:
+        except ImmediateResponse as e:
             self.assertEqual(e.response['Allow'], '')
 
         # Not an allowed request.
@@ -709,7 +709,7 @@ class ResourceTestCase(TestCase):
         try:
             basic.method_check(request, allowed=['post'])
             self.fail("Should have thrown an exception.")
-        except ImmediateResponse, e:
+        except ImmediateResponse as e:
             self.assertEqual(e.response['Allow'], 'POST')
 
         # Allowed (single).
@@ -733,7 +733,7 @@ class ResourceTestCase(TestCase):
         try:
             basic.method_check(request, allowed=['get', 'put', 'delete', 'patch'])
             self.fail("Should have thrown an exception.")
-        except ImmediateResponse, e:
+        except ImmediateResponse as e:
             self.assertEqual(e.response['Allow'], 'GET,PUT,DELETE,PATCH')
 
         # Allowed (multiple).
@@ -3195,7 +3195,7 @@ class ModelResourceTestCase(TestCase):
         try:
             resp = resource.dispatch('list', request)
             self.fail()
-        except ImmediateResponse, e:
+        except ImmediateResponse as e:
             self.assertEqual(e.response.status_code, 429)
             self.assertEqual(len(cache.get('noaddr_nohost_accesses')), 2)
 
@@ -3203,7 +3203,7 @@ class ModelResourceTestCase(TestCase):
         try:
             resp = resource.dispatch('list', request)
             self.fail()
-        except ImmediateResponse, e:
+        except ImmediateResponse as e:
             self.assertEqual(e.response.status_code, 429)
             self.assertEqual(len(cache.get('noaddr_nohost_accesses')), 2)
 
@@ -4017,7 +4017,7 @@ class BasicAuthResourceTestCase(TestCase):
         try:
             resp = resource.dispatch_list(request)
             self.fail()
-        except ImmediateResponse, e:
+        except ImmediateResponse as e:
             self.assertEqual(e.response.status_code, 401)
 
         # Try again with ``wrap_view`` for sanity.
@@ -4041,7 +4041,7 @@ class BasicAuthResourceTestCase(TestCase):
         try:
             resp = resource.dispatch_detail(request, pk=1)
             self.fail()
-        except ImmediateResponse, e:
+        except ImmediateResponse as e:
             self.assertEqual(e.response.status_code, 401)
 
         # Try again with ``wrap_view`` for sanity.
