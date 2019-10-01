@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+from builtins import object
 from tastypie.utils import IS_DJANGO_1_4
 
 if IS_DJANGO_1_4:

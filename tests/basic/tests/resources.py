@@ -1,3 +1,4 @@
+from builtins import object
 from django.contrib.auth.models import User
 from django.http import HttpRequest
 from django.test import TestCase
@@ -11,39 +12,39 @@ from basic.models import Note, AnnotatedNote, SlugBasedNote
 class InvalidLazyUserResource(ModelResource):
     notes = ToManyField('basic.api.resources.FooResource', 'notes')
 
-    class Meta:
+    class Meta(object):
         queryset = User.objects.all()
 
 
 class NoPathLazyUserResource(ModelResource):
     notes = ToManyField('FooResource', 'notes')
 
-    class Meta:
+    class Meta(object):
         queryset = User.objects.all()
 
 
 class LazyUserResource(ModelResource):
     notes = ToManyField('basic.tests.resources.NoteResource', 'notes')
 
-    class Meta:
+    class Meta(object):
         queryset = User.objects.all()
         api_name = 'foo'
 
 
 class NoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
 
 
 class AnnotatedNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = AnnotatedNote.objects.all()
 
 
 class NoteWithAnnotationsResource(ModelResource):
     annotated = ToOneField(AnnotatedNoteResource, 'annotated', null=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
 
 

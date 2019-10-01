@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from builtins import object
 import warnings
 from django.conf.urls import url, include
 from django.core.exceptions import ImproperlyConfigured

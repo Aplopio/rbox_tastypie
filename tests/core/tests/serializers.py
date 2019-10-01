@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from builtins import object
 import datetime
 import yaml
 from decimal import Decimal
@@ -23,7 +24,7 @@ class UnsafeObject(object):
 
 
 class NoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.filter(is_active=True)
 
@@ -33,7 +34,7 @@ class AnotherNoteResource(ModelResource):
     meta = fields.DictField(attribute='metadata', null=True)
     owed = fields.DecimalField(attribute='money_owed', null=True)
 
-    class Meta:
+    class Meta(object):
         resource_name = 'anothernotes'
         queryset = Note.objects.filter(is_active=True)
 

@@ -1,3 +1,4 @@
+from builtins import object
 from tastypie import http
 from django.http import HttpResponse
 from django.utils.cache import patch_cache_control, patch_vary_headers

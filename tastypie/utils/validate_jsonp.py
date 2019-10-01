@@ -5,6 +5,7 @@
 
 """Validate Javascript Identifiers for use as JSON-P callback parameters."""
 from __future__ import unicode_literals
+from builtins import chr
 import re
 
 from unicodedata import category
@@ -80,7 +81,7 @@ def is_valid_javascript_identifier(identifier, escape=r'\\u', ucd_cat=category):
             if len(segment) < 4:
                 return False
             try:
-                add_char(unichr(int('0x' + segment[:4], 16)))
+                add_char(chr(int('0x' + segment[:4], 16)))
             except Exception:
                 return False
             add_char(segment[4:])

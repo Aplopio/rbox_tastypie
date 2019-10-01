@@ -1,3 +1,4 @@
+from builtins import object
 from django.contrib.auth.models import User
 from tastypie import fields
 from tastypie.constants import ALL
@@ -12,7 +13,7 @@ from tastypie.validation import FormValidation
 
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'users'
         queryset = User.objects.all()
         authorization = Authorization()
@@ -20,13 +21,13 @@ class UserResource(ModelResource):
 
 class AnnotatedNoteForm(forms.ModelForm):
 
-    class Meta:
+    class Meta(object):
         model = AnnotatedNote
         exclude = ('note',)
 
 class AnnotatedNoteResource(ModelResource):
 
-    class Meta:
+    class Meta(object):
         resource_name = 'annotated'
         queryset = AnnotatedNote.objects.all()
         authorization = Authorization()
@@ -34,7 +35,7 @@ class AnnotatedNoteResource(ModelResource):
 
 class NoteForm(forms.ModelForm):
 
-    class Meta:
+    class Meta(object):
         model = Note
         exclude = ('user', 'created', 'updated')
 
@@ -42,7 +43,7 @@ class NoteResource(ModelResource):
     user = fields.ForeignKey(UserResource, 'user')
     annotated = fields.ForeignKey(AnnotatedNoteResource, 'annotated', related_name='note', null=True, full=True)
 
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.all()
         authorization = Authorization()

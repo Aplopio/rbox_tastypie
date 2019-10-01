@@ -21,7 +21,7 @@ class GenericForeignKeyField(fields.ToOneField):
         if len(to) <= 0:
             raise ValueError('to field must have some values')
 
-        for k, v in to.items():
+        for k, v in list(to.items()):
             if not issubclass(k, models.Model) or not issubclass(v, Resource):
                 raise ValueError('to field must map django models to tastypie resources')
 
@@ -64,7 +64,7 @@ class GenericForeignKeyField(fields.ToOneField):
             #this case should never happen. self._to_class should always be none
             return self._to_class
 
-        return partial(GenericResource, resources=self.to.values())
+        return partial(GenericResource, resources=list(self.to.values()))
 
     def resource_from_uri(self, fk_resource, uri, request=None, related_obj=None, related_name=None):
         try:

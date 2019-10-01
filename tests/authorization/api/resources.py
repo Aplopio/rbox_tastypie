@@ -1,3 +1,4 @@
+from builtins import object
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.core.exceptions import ObjectDoesNotExist
@@ -59,7 +60,7 @@ class PerUserAuthorization(Authorization):
 
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = User.objects.all()
         authentication = BasicAuthentication()
         authorization = Authorization()
@@ -67,7 +68,7 @@ class UserResource(ModelResource):
 
 
 class SiteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = Site.objects.all()
         authentication = BasicAuthentication()
         authorization = Authorization()
@@ -77,7 +78,7 @@ class AuthorProfileResource(ModelResource):
     user = fields.ToOneField(UserResource, 'user', full=True)
     sites = fields.ToManyField(SiteResource, 'sites', related_name='author_profiles', full=True)
 
-    class Meta:
+    class Meta(object):
         queryset = AuthorProfile.objects.all()
         authentication = BasicAuthentication()
         authorization = Authorization()
@@ -86,7 +87,7 @@ class AuthorProfileResource(ModelResource):
 class ArticleResource(ModelResource):
     authors = fields.ToManyField(AuthorProfileResource, 'authors', related_name='articles', full=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Article.objects.all()
         authentication = BasicAuthentication()
         authorization = PerUserAuthorization()

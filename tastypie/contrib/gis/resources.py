@@ -1,7 +1,9 @@
 # See COPYING file in this directory.
 # Some code originally from django-boundaryservice
 from __future__ import unicode_literals
-from urllib import unquote
+from future import standard_library
+standard_library.install_aliases()
+from urllib.parse import unquote
 
 from django.contrib.gis.db.models import GeometryField
 from django.contrib.gis.geos import GEOSGeometry

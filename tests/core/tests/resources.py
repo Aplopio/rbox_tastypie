@@ -1,3 +1,5 @@
+from builtins import str
+from builtins import object
 import base64
 import copy
 import datetime
@@ -69,7 +71,7 @@ class BasicResourceWithDifferentListAndDetailFields(Resource):
         test_object_1.date_joined = aware_datetime(2010, 3, 30, 9, 0, 0)
         return [test_object_1]
 
-    class Meta:
+    class Meta(object):
         object_class = TestObject
         resource_name = 'basic'
 
@@ -79,7 +81,7 @@ class BasicResourceWithDifferentListAndDetailFieldsCallable(Resource):
     view_count = fields.IntegerField(attribute='view_count', default=0, use_in=lambda x,y: True)
     date_joined = fields.DateTimeField(null=True, use_in=lambda x,y: False)
 
-    class Meta:
+    class Meta(object):
         object_class = TestObject
         resource_name = 'basic'
 
@@ -89,7 +91,7 @@ class BasicResource(Resource):
     view_count = fields.IntegerField(attribute='view_count', default=0)
     date_joined = fields.DateTimeField(null=True)
 
-    class Meta:
+    class Meta(object):
         object_class = TestObject
         resource_name = 'basic'
         authorization = Authorization()
@@ -120,7 +122,7 @@ class AnotherBasicResource(BasicResource):
     meta = fields.DictField(attribute='metadata', null=True)
     owed = fields.DecimalField(attribute='money_owed', null=True)
 
-    class Meta:
+    class Meta(object):
         object_class = TestObject
         resource_name = 'anotherbasic'
         authorization = Authorization()
@@ -146,7 +148,7 @@ class NoUriBasicResource(BasicResource):
     view_count = fields.IntegerField(attribute='view_count', default=0)
     date_joined = fields.DateTimeField(null=True)
 
-    class Meta:
+    class Meta(object):
         object_class = TestObject
         include_resource_uri = False
         authorization = Authorization()
@@ -155,14 +157,14 @@ class NoUriBasicResource(BasicResource):
 class NullableNameResource(Resource):
     name = fields.CharField(attribute='name', null=True)
 
-    class Meta:
+    class Meta(object):
         object_class = TestObject
         resource_name = 'nullable_name'
         authorization = Authorization()
 
 
 class MangledBasicResource(BasicResource):
-    class Meta:
+    class Meta(object):
         object_class = TestObject
         resource_name = 'mangledbasic'
         authorization = Authorization()
@@ -556,7 +558,7 @@ class ResourceTestCase(TestCase):
         self.assertRaises(NotImplementedError, basic.rollback, bundles_seen)
 
     def adjust_schema(self, schema_dict):
-        for field, field_info in schema_dict['fields'].items():
+        for field, field_info in list(schema_dict['fields'].items()):
             if isinstance(field_info['default'], fields.NOT_PROVIDED):
                 schema_dict['fields'][field]['default'] = 'No default provided.'
 
@@ -665,14 +667,14 @@ class ResourceTestCase(TestCase):
         })
 
     def test_subclassing(self):
-        class CommonMeta:
+        class CommonMeta(object):
             default_format = 'application/xml'
 
         class MiniResource(Resource):
             abcd = fields.CharField(default='abcd')
             efgh = fields.IntegerField(default=1234)
 
-            class Meta:
+            class Meta(object):
                 resource_name = 'mini'
 
         mini = MiniResource()
@@ -800,7 +802,7 @@ class ResourceTestCase(TestCase):
 # ====================
 
 class DateRecordResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = DateRecord.objects.all()
         always_return_data = True
         authorization = Authorization()
@@ -815,7 +817,7 @@ class DateRecordResource(ModelResource):
 
 
 class NoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         authorization = Authorization()
         filtering = {
@@ -834,7 +836,7 @@ class NoteResource(ModelResource):
         return '/api/v1/notes/%s/' % bundle_or_obj.obj.id
 
 class NoQuerysetNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'noqsnotes'
         authorization = Authorization()
         filtering = {
@@ -844,7 +846,7 @@ class NoQuerysetNoteResource(ModelResource):
 
 
 class LightlyCustomNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'noteish'
         authorization = Authorization()
         allowed_methods = ['get']
@@ -852,7 +854,7 @@ class LightlyCustomNoteResource(NoteResource):
 
 
 class TinyLimitNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         limit = 3
         resource_name = 'littlenote'
         authorization = Authorization()
@@ -861,7 +863,7 @@ class TinyLimitNoteResource(NoteResource):
 
 
 class AlwaysDataNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'alwaysdatanote'
         queryset = Note.objects.filter(is_active=True)
         always_return_data = True
@@ -872,7 +874,7 @@ class AlwaysDataNoteResourceUseIn(NoteResource):
     author = fields.CharField(attribute='author__username', use_in="detail")
     constant = fields.IntegerField(default=20, use_in="list")
 
-    class Meta:
+    class Meta(object):
         resource_name = 'alwaysdatanote'
         queryset = Note.objects.filter(is_active=True)
         always_return_data = True
@@ -883,7 +885,7 @@ class VeryCustomNoteResource(NoteResource):
     author = fields.CharField(attribute='author__username')
     constant = fields.IntegerField(default=20)
 
-    class Meta:
+    class Meta(object):
         authorization = Authorization()
         limit = 50
         resource_name = 'notey'
@@ -895,7 +897,7 @@ class VeryCustomNoteResource(NoteResource):
 
 
 class AutoNowNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'autonownotes'
         queryset = AutoNowNote.objects.filter(is_active=True)
         authorization = Authorization()
@@ -915,7 +917,7 @@ class CustomPaginator(Paginator):
 
 
 class CustomPageNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         limit = 10
         resource_name = 'pagey'
         paginator_class = CustomPaginator
@@ -924,7 +926,7 @@ class CustomPageNoteResource(NoteResource):
 
 
 class AlwaysUserNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'noteish'
         queryset = Note.objects.filter(is_active=True)
         authorization = Authorization()
@@ -937,12 +939,12 @@ class UseInNoteResource(NoteResource):
     content = fields.CharField(attribute='content', use_in='detail')
     title = fields.CharField(attribute='title', use_in='list')
 
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
         authorization = Authorization()
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = User.objects.all()
         authorization = Authorization()
 
@@ -957,7 +959,7 @@ class DetailedNoteResource(ModelResource):
     user = fields.ForeignKey(UserResource, 'author')
     hello_world = fields.CharField(default='world')
 
-    class Meta:
+    class Meta(object):
         resource_name = 'detailednotes'
         filtering = {
             'content': ['startswith', 'exact'],
@@ -984,14 +986,14 @@ class DetailedNoteResourceWithHydrate(DetailedNoteResource):
 class RequiredFKNoteResource(ModelResource):
     editor = fields.ForeignKey(UserResource, 'editor')
 
-    class Meta:
+    class Meta(object):
         resource_name = 'requiredfknotes'
         queryset = NoteWithEditor.objects.all()
         authorization = Authorization()
 
 
 class ThrottledNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'throttlednotes'
         queryset = Note.objects.filter(is_active=True)
         throttle = CacheThrottle(throttle_at=2, timeframe=5, expiration=5)
@@ -999,7 +1001,7 @@ class ThrottledNoteResource(NoteResource):
 
 
 class BasicAuthNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'notes'
         queryset = Note.objects.filter(is_active=True)
         authentication = BasicAuthentication()
@@ -1007,14 +1009,14 @@ class BasicAuthNoteResource(NoteResource):
 
 
 class NoUriNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.filter(is_active=True)
         include_resource_uri = False
         authorization = Authorization()
 
 
 class WithAbsoluteURLNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.filter(is_active=True)
         include_absolute_url = True
         resource_name = 'withabsoluteurlnote'
@@ -1028,14 +1030,14 @@ class WithAbsoluteURLNoteResource(ModelResource):
 
 
 class AlternativeCollectionNameNoteResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.filter(is_active=True)
         collection_name = 'alt_objects'
         authorization = Authorization()
 
 
 class SubjectResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = Subject.objects.all()
         resource_name = 'subjects'
         filtering = {
@@ -1048,7 +1050,7 @@ class RelatedNoteResource(ModelResource):
     author = fields.ForeignKey(UserResource, 'author')
     subjects = fields.ManyToManyField(SubjectResource, 'subjects')
 
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
         resource_name = 'relatednotes'
         filtering = {
@@ -1062,7 +1064,7 @@ class RelatedNoteResource(ModelResource):
 class AnotherSubjectResource(ModelResource):
     notes = fields.ToManyField(DetailedNoteResource, 'notes')
 
-    class Meta:
+    class Meta(object):
         queryset = Subject.objects.all()
         resource_name = 'anothersubjects'
         excludes = ['notes']
@@ -1076,7 +1078,7 @@ class AnotherRelatedNoteResource(ModelResource):
     author = fields.ForeignKey(UserResource, 'author')
     subjects = fields.ManyToManyField(SubjectResource, 'subjects', full=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
         resource_name = 'relatednotes'
         filtering = {
@@ -1091,7 +1093,7 @@ class YetAnotherRelatedNoteResource(ModelResource):
     author = fields.ForeignKey(UserResource, 'author', full=True)
     subjects = fields.ManyToManyField(SubjectResource, 'subjects')
 
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
         resource_name = 'relatednotes'
         filtering = {
@@ -1111,7 +1113,7 @@ class NullableMediaBitResource(ModelResource):
     # The old (broke) way to allow ``note`` to be omitted, even though it's a required field.
     note = fields.ToOneField(NoteResource, 'note', null=True)
 
-    class Meta:
+    class Meta(object):
         queryset = MediaBit.objects.all()
         resource_name = 'nullablemediabit'
         authorization = Authorization()
@@ -1121,7 +1123,7 @@ class ReadOnlyRelatedNoteResource(ModelResource):
     author = fields.ToOneField(UserResource, 'author', readonly=True)
     my_property = fields.CharField(attribute='my_property', null=True, readonly=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
         authorization = Authorization()
 
@@ -1130,7 +1132,7 @@ class BlankMediaBitResource(ModelResource):
     # Allow ``note`` to be omitted, even though it's a required field.
     note = fields.ToOneField(NoteResource, 'note', blank=True)
 
-    class Meta:
+    class Meta(object):
         queryset = MediaBit.objects.all()
         resource_name = 'blankmediabit'
         authorization = Authorization()
@@ -1147,7 +1149,7 @@ class BlankMediaBitResource(ModelResource):
 
 
 class TestOptionsResource(ModelResource):
-    class Meta:
+    class Meta(object):
         queryset = Note.objects.all()
         allowed_methods = ['post']
         list_allowed_methods = ['post', 'put']
@@ -1167,7 +1169,7 @@ class PerUserAuthorization(Authorization):
 
 
 class PerUserNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'perusernotes'
         queryset = Note.objects.all()
         authorization = PerUserAuthorization()
@@ -1207,7 +1209,7 @@ class PerObjectAuthorization(Authorization):
 
 
 class PerObjectNoteResource(NoteResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'perobjectnotes'
         queryset = Note.objects.all()
         authorization = PerObjectAuthorization()
@@ -1232,7 +1234,7 @@ class PerObjectNoteResource(NoteResource):
 class CounterResource(ModelResource):
     count = fields.IntegerField('count', default=0, null=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Counter.objects.all()
         authorization = Authorization()
 
@@ -1256,7 +1258,7 @@ class CounterAuthorization(Authorization):
 class CounterCreateDetailResource(ModelResource):
     count = fields.IntegerField('count', default=0, null=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Counter.objects.all()
         authorization = CounterAuthorization()
 
@@ -1264,7 +1266,7 @@ class CounterCreateDetailResource(ModelResource):
 class CounterUpdateDetailResource(ModelResource):
     count = fields.IntegerField('count', default=0, null=True)
 
-    class Meta:
+    class Meta(object):
         queryset = Counter.objects.all()
         authorization = CounterAuthorization()
 
@@ -1574,7 +1576,7 @@ class ModelResourceTestCase(TestCase):
         self.assertEqual(resource.determine_format(request), 'application/xml')
 
     def adjust_schema(self, schema_dict):
-        for field, field_info in schema_dict['fields'].items():
+        for field, field_info in list(schema_dict['fields'].items()):
             if isinstance(field_info['default'], fields.NOT_PROVIDED):
                 schema_dict['fields'][field]['default'] = 'No default provided.'
             if isinstance(field_info['default'], (datetime.datetime, datetime.date)):
@@ -2206,7 +2208,7 @@ class ModelResourceTestCase(TestCase):
         resp = resource.wrap_view('get_list')(request)
         self.assertEqual(resp.status_code, 400)
         res = json.loads(resp.content.decode('utf-8'))
-        self.assertTrue('error' in res.keys())
+        self.assertTrue('error' in list(res.keys()))
         self.assertTrue('monkey' in res['error']) #Error looks like "No matching \'monkey\' field for ordering on.
 
         # Test to make sure we're not inadvertently caching the QuerySet.
@@ -3270,7 +3272,7 @@ class ModelResourceTestCase(TestCase):
 
     def test_obj_delete_list_non_queryset(self):
         class NonQuerysetNoteResource(ModelResource):
-            class Meta:
+            class Meta(object):
                 queryset = Note.objects.all()
 
             def authorized_delete_list(self, object_list, bundle):
@@ -3607,13 +3609,13 @@ class ModelResourceTestCase(TestCase):
                 return self.cleaned_data
 
         class ValidatedNoteResource(ModelResource):
-            class Meta:
+            class Meta(object):
                 queryset = Note.objects.all()
                 resource_name = 'validated'
                 validation = FormValidation(form_class=NoteForm)
 
         class ValidatedXMLNoteResource(ModelResource):
-            class Meta:
+            class Meta(object):
                 queryset = Note.objects.all()
                 resource_name = 'validated'
                 validation = FormValidation(form_class=NoteForm)
@@ -3651,7 +3653,7 @@ class ModelResourceTestCase(TestCase):
         class SelfResource(ModelResource):
             me_baby_me = fields.ToOneField('self', 'parent', null=True)
 
-            class Meta:
+            class Meta(object):
                 queryset = Note.objects.all()
                 resource_name = 'me_baby_me'
 
@@ -3662,7 +3664,7 @@ class ModelResourceTestCase(TestCase):
         self.assertEqual(me_baby_me.fields['me_baby_me'].to_class, SelfResource)
 
         class AnotherSelfResource(SelfResource):
-            class Meta:
+            class Meta(object):
                 queryset = Note.objects.all()
                 resource_name = 'another_me_baby_me'
 
@@ -3677,7 +3679,7 @@ class ModelResourceTestCase(TestCase):
             abcd = fields.CharField(default='abcd')
             efgh = fields.IntegerField(default=1234)
 
-            class Meta:
+            class Meta(object):
                 queryset = Note.objects.all()
                 resource_name = 'mini'
 
@@ -3689,7 +3691,7 @@ class ModelResourceTestCase(TestCase):
         class AnotherMiniResource(MiniResource):
             ijkl = fields.BooleanField(default=True)
 
-            class Meta:
+            class Meta(object):
                 queryset = Note.objects.all()
                 resource_name = 'anothermini'
 
@@ -3701,7 +3703,7 @@ class ModelResourceTestCase(TestCase):
         class YetAnotherMiniResource(MiniResource):
             mnop = fields.FloatField(default=True)
 
-            class Meta:
+            class Meta(object):
                 queryset = Note.objects.all()
                 resource_name = 'yetanothermini'
                 fields = ['title', 'abcd', 'mnop']
@@ -4181,7 +4183,7 @@ class BustedResourceTestCase(TestCase):
 class ObjectlessResource(Resource):
     test = fields.CharField(default='objectless_test')
 
-    class Meta:
+    class Meta(object):
         resource_name = 'objectless'
 
 

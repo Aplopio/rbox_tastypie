@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from builtins import object
 import datetime
 import re
 import django
@@ -189,7 +190,7 @@ class Serializer(object):
         """
         desired_format = None
 
-        for short_format, long_format in self.content_types.items():
+        for short_format, long_format in list(self.content_types.items()):
             if format == long_format:
                 if hasattr(self, "to_%s" % short_format):
                     desired_format = short_format
@@ -210,7 +211,7 @@ class Serializer(object):
 
         format = format.split(';')[0]
 
-        for short_format, long_format in self.content_types.items():
+        for short_format, long_format in list(self.content_types.items()):
             if format == long_format:
                 if hasattr(self, "from_%s" % short_format):
                     desired_format = short_format
@@ -236,9 +237,9 @@ class Serializer(object):
         if isinstance(data, (list, tuple)):
             return [self.to_simple(item, options) for item in data]
         if isinstance(data, dict):
-            return dict((key, self.to_simple(val, options)) for (key, val) in data.items())
+            return dict((key, self.to_simple(val, options)) for (key, val) in list(data.items()))
         elif isinstance(data, Bundle):
-            return dict((key, self.to_simple(val, options)) for (key, val) in data.data.items())
+            return dict((key, self.to_simple(val, options)) for (key, val) in list(data.data.items()))
         elif hasattr(data, 'dehydrated_type'):
             if getattr(data, 'dehydrated_type', None) == 'related' and data.is_m2m == False:
                 if data.full:
@@ -288,12 +289,12 @@ class Serializer(object):
             else:
                 element = Element(name or 'object')
                 element.set('type', 'hash')
-            for (key, value) in data.items():
+            for (key, value) in list(data.items()):
                 element.append(self.to_etree(value, options, name=key, depth=depth+1))
                 element[:] = sorted(element, key=lambda x: x.tag)
         elif isinstance(data, Bundle):
             element = Element(name or 'object')
-            for field_name, field_object in data.data.items():
+            for field_name, field_object in list(data.data.items()):
                 element.append(self.to_etree(field_object, options, name=field_name, depth=depth+1))
                 element[:] = sorted(element, key=lambda x: x.tag)
         elif hasattr(data, 'dehydrated_type'):

@@ -1,3 +1,4 @@
+from builtins import object
 from django.contrib.auth.models import User
 from tastypie import fields
 from tastypie.resources import ALL
@@ -7,7 +8,7 @@ from gis.models import GeoNote
 
 
 class UserResource(ModelResource):
-    class Meta:
+    class Meta(object):
         resource_name = 'users'
         queryset = User.objects.all()
         authorization = Authorization()
@@ -16,7 +17,7 @@ class UserResource(ModelResource):
 class GeoNoteResource(ModelResource):
     user = fields.ForeignKey(UserResource, 'user')
 
-    class Meta:
+    class Meta(object):
         resource_name = 'geonotes'
         queryset = GeoNote.objects.all()
         authorization = Authorization()

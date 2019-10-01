@@ -1,16 +1,18 @@
 from __future__ import absolute_import
+from future import standard_library
+standard_library.install_aliases()
 from testcases import TestServerTestCase
 import json
 
 try:
     from .http.client import HTTPConnection
 except ImportError:
-    from httplib import HTTPConnection
+    from http.client import HTTPConnection
 
 try:
     from urllib.parse import quote
 except ImportError:
-    from urllib import quote
+    from urllib.parse import quote
 
 
 class HTTPTestCase(TestServerTestCase):

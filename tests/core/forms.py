@@ -1,3 +1,4 @@
+from builtins import object
 from django import forms
 from core.models import Note
 
@@ -5,12 +6,12 @@ from core.models import Note
 class NoteForm(forms.ModelForm):
     foobaz = forms.CharField()
     
-    class Meta:
+    class Meta(object):
         model = Note
 
 
 class VeryCustomNoteForm(NoteForm):
-    class Meta:
+    class Meta(object):
         model = Note
         fields = ['title', 'content', 'created', 'is_active', 'foobaz']
 

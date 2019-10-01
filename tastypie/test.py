@@ -1,4 +1,8 @@
 from __future__ import unicode_literals
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import object
 import time
 
 from django.conf import settings
@@ -11,7 +15,7 @@ from tastypie.serializers import Serializer
 try:
     from urllib.parse import urlparse
 except ImportError:
-    from urlparse import urlparse
+    from urllib.parse import urlparse
 
 
 class TestApiClient(object):
@@ -309,7 +313,7 @@ class ResourceTestCase(TestCase):
             'oauth_timestamp': str(int(time.time())),
             'oauth_token': 'foo',
         }
-        return 'OAuth %s' % ','.join([key+'='+value for key, value in oauth_data.items()])
+        return 'OAuth %s' % ','.join([key+'='+value for key, value in list(oauth_data.items())])
 
     def assertHttpOK(self, resp):
         """

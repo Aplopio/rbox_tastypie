@@ -1,3 +1,5 @@
+from past.builtins import basestring
+from builtins import object
 from tastypie.exceptions import TastypieError, Unauthorized
 import importlib
 
