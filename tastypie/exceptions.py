@@ -4,7 +4,9 @@ from django.http import HttpResponse
 
 class TastypieError(Exception):
     """A base exception for other tastypie-related errors."""
-    pass
+
+    def __init__(self, message=None):
+        self.message = message if message else ""
 
 
 class HydrationError(TastypieError):
