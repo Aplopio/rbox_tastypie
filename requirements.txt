@@ -1,5 +1,5 @@
 Django>=1.5.0
-python-dateutil>=2.1
+python-dateutil>=>=2.6.0
 lxml
 defusedxml
 PyYAML
