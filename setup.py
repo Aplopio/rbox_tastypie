@@ -32,7 +32,7 @@ setup(
     zip_safe=False,
     requires=[
         'python_mimeparse(>=0.1.4)',
-        'dateutil(==2.1)',
+        'dateutil(>=2.6.0)',
     ],
     install_requires=[
         'python-mimeparse >= 0.1.4',
