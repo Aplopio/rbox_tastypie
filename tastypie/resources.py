@@ -48,7 +48,7 @@ from tastypie.event_handler import EventHandler
 from tastypie.bundle_pre_processor import BundlePreProcessor
 from tastypie import response_router_obj
 from django.core.exceptions import ImproperlyConfigured
-from django.core.urlresolvers import RegexURLResolver
+from django.urls.resolvers import URLResolver as RegexURLResolver
 from django.core.signals import got_request_exception
 
 from copy import copy
