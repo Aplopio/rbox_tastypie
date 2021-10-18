@@ -32,7 +32,7 @@ if 'django.contrib.auth' in settings.INSTALLED_APPS:
     import uuid
     from tastypie.compat import AUTH_USER_MODEL
     class ApiKey(models.Model):
-        user = models.OneToOneField(AUTH_USER_MODEL, related_name='api_key')
+        user = models.OneToOneField(AUTH_USER_MODEL, related_name='api_key', on_delete=models.CASCADE)
         key = models.CharField(max_length=128, blank=True, default='', db_index=True)
         created = models.DateTimeField(default=now)
 
