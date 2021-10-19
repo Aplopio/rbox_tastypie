@@ -3,7 +3,7 @@ from builtins import object
 import warnings
 from django.conf.urls import url, include
 from django.core.exceptions import ImproperlyConfigured
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.http import HttpResponse, HttpResponseBadRequest
 from tastypie.exceptions import NotRegistered, BadRequest
 from tastypie.serializers import Serializer

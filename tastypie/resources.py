@@ -16,7 +16,7 @@ else:
     from django.conf.urls import url, include
 
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured
-from django.core.urlresolvers import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
+from django.urls import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
 from django.core.signals import got_request_exception
 from django.db import transaction
 try:
@@ -48,7 +48,7 @@ from tastypie.event_handler import EventHandler
 from tastypie.bundle_pre_processor import BundlePreProcessor
 from tastypie import response_router_obj
 from django.core.exceptions import ImproperlyConfigured
-from django.core.urlresolvers import RegexURLResolver
+from django.urls.resolvers import URLResolver as RegexURLResolver
 from django.core.signals import got_request_exception
 
 from copy import copy
@@ -2056,7 +2056,10 @@ class BaseModelResource(Resource):
         contributed ApiFields.
         """
         # Ignore certain fields (related fields).
-        if getattr(field, 'rel'):
+        if getattr(field, 'rel', None):
+            return True
+
+        if getattr(field, 'remote_field'):
             return True
 
         return False
