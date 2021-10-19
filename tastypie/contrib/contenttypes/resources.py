@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from tastypie.bundle import Bundle
 from tastypie.resources import ModelResource
 from tastypie.exceptions import NotFound
-from django.core.urls import resolve, Resolver404, get_script_prefix
+from django.urls import resolve, Resolver404, get_script_prefix
 
 
 class GenericResource(ModelResource):
