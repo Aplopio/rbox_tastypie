@@ -2263,6 +2263,7 @@ class BaseModelResource(Resource):
         #     query_terms = QUERY_TERMS
 
         query_terms = QUERY_TERMS
+        print(query_terms)
 
         for filter_expr, value in list(filters.items()):
             filter_bits = filter_expr.split(LOOKUP_SEP)
