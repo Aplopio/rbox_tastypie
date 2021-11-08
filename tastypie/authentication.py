@@ -252,10 +252,10 @@ class SessionAuthentication(Authentication):
         # We also can't risk accessing ``request.POST``, which will break with
         # the serialized bodies.
         if request.method in ('GET', 'HEAD', 'OPTIONS', 'TRACE'):
-            return request.user.is_authenticated()
+            return request.user.is_authenticated
 
         if getattr(request, '_dont_enforce_csrf_checks', False):
-            return request.user.is_authenticated()
+            return request.user.is_authenticated
 
         csrf_token = _sanitize_token(request.COOKIES.get(settings.CSRF_COOKIE_NAME, ''))
 
@@ -275,7 +275,7 @@ class SessionAuthentication(Authentication):
         if not constant_time_compare(request_csrf_token, csrf_token):
             return False
 
-        return request.user.is_authenticated()
+        return request.user.is_authenticated
 
     def get_identifier(self, request):
         """
