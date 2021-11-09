@@ -2256,11 +2256,13 @@ class BaseModelResource(Resource):
             filters = {}
         qs_filters = {}
 
-        if getattr(self._meta, 'queryset', None) is not None:
-            # Get the possible query terms from the current QuerySet.
-            query_terms = self._meta.queryset.query.query_terms
-        else:
-            query_terms = QUERY_TERMS
+        # if getattr(self._meta, 'queryset', None) is not None:
+        #     # Get the possible query terms from the current QuerySet.
+        #     query_terms = self._meta.queryset.query.query_terms
+        # else:
+        #     query_terms = QUERY_TERMS
+
+        query_terms = QUERY_TERMS
 
         for filter_expr, value in list(filters.items()):
             filter_bits = filter_expr.split(LOOKUP_SEP)
