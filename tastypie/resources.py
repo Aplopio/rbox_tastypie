@@ -418,7 +418,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
             try:
                 if rest_of_url[-1] != '/':
-                    rest_of_url = "%s%s" %(rest_of_url, trailing_slash())
+                    rest_of_url = r"%s%s" %(rest_of_url, trailing_slash())
                 callback, callback_args, callback_kwargs = resolver.resolve(rest_of_url)
                 callback_kwargs.update({'%s_resource_name'%self._meta.resource_name: self._meta.resource_name, '%s_pk'%self._meta.resource_name: pk, 'api_name': self._meta.api_name})
                 try:
