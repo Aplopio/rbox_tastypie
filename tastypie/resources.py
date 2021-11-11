@@ -48,7 +48,7 @@ from tastypie.event_handler import EventHandler
 from tastypie.bundle_pre_processor import BundlePreProcessor
 from tastypie import response_router_obj
 from django.core.exceptions import ImproperlyConfigured
-from django.urls.resolvers import URLResolver as RegexURLResolver
+from django.urls.resolvers import URLResolver as RegexURLResolver, RegexPattern
 from django.core.signals import got_request_exception
 
 from copy import copy
@@ -80,6 +80,7 @@ except ImportError:
 class NOT_AVAILABLE(object):
     def __str__(self):
         return 'No such data is available.'
+
 
 class CustomRegexURLResolver(RegexURLResolver):
     @property
@@ -415,7 +416,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         for field in sub_resource_field_list:
             sub_resource_obj = field.get_related_resource(parent_obj, parent_bundle)
 
-            resolver = CustomRegexURLResolver(r'^', sub_resource_obj.urls)
+            resolver = CustomRegexURLResolver(RegexPattern(r'^/'), sub_resource_obj.urls)
             try:
                 if rest_of_url[-1] != '/':
                     rest_of_url = "%s%s" %(rest_of_url, trailing_slash())
