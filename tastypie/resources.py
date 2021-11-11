@@ -999,7 +999,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             if self.parent_obj:
                 #am being used as a sub resource. Need to resolve correctly
                 rest_of_url = view_kwargs.pop('%s_rest_of_url'%self.parent_resource._meta.resource_name)
-                resolver = CustomRegexURLResolver(r'^', self.urls)
+                resolver = CustomRegexURLResolver(RegexPattern(r'^'), self.urls)
                 if rest_of_url[-1] != '/':
                     rest_of_url = "%s%s" %(rest_of_url, trailing_slash())
                 view, view_args, view_kwargs = resolver.resolve(rest_of_url)
