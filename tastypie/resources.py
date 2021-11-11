@@ -416,7 +416,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         for field in sub_resource_field_list:
             sub_resource_obj = field.get_related_resource(parent_obj, parent_bundle)
 
-            resolver = CustomRegexURLResolver(RegexPattern(r'^/'), sub_resource_obj.urls)
+            resolver = CustomRegexURLResolver(RegexPattern(r'^'), sub_resource_obj.urls)
             try:
                 if rest_of_url[-1] != '/':
                     rest_of_url = "%s%s" %(rest_of_url, trailing_slash())
