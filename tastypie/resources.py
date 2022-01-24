@@ -15,7 +15,9 @@ if IS_DJANGO_1_4:
 else:
     from django.conf.urls import url, include
 
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured
+from django.core.exceptions import (
+    ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured, FieldDoesNotExist
+)
 from django.urls import NoReverseMatch, reverse, resolve, Resolver404, get_script_prefix, reverse_lazy
 from django.core.signals import got_request_exception
 from django.db import transaction
@@ -24,7 +26,6 @@ try:
 except ImportError:
     from django.db.models.sql.constants import LOOKUP_SEP
 
-from django.db.models.sql.constants import QUERY_TERMS
 from django.http import HttpResponse, HttpResponseNotFound, Http404
 from django.utils.cache import patch_cache_control, patch_vary_headers
 from django.utils import six
@@ -54,7 +55,6 @@ from django.core.signals import got_request_exception
 from copy import copy
 
 from bson import ObjectId
-from pymongo import MongoClient
 from tastypie.bundle import Bundle
 
 
@@ -2263,8 +2263,6 @@ class BaseModelResource(Resource):
         # else:
         #     query_terms = QUERY_TERMS
 
-        query_terms = QUERY_TERMS
-
         for filter_expr, value in list(filters.items()):
             filter_bits = filter_expr.split(LOOKUP_SEP)
             field_name = filter_bits.pop(0)
@@ -2274,6 +2272,15 @@ class BaseModelResource(Resource):
                 # It's not a field we know about. Move along citizen.
                 continue
 
+            try:
+                django_field_name = self.fields[field_name].attribute
+                django_field = self._meta.object_class._meta.get_field(django_field_name)
+                if hasattr(django_field, "field"):
+                    django_field = django_field.field
+            except FieldDoesNotExist:
+                raise InvalidFilterError("The '%s' field is not a valid field name" % field_name)
+
+            query_terms = django_field.get_lookups().keys()
             if len(filter_bits) and filter_bits[-1] in query_terms:
                 filter_type = filter_bits.pop()
 
