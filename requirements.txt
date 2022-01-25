@@ -1,4 +1,4 @@
-Django==2.2.15
+Django==2.2.26
 python-dateutil>=2.6.0
 lxml
 defusedxml
