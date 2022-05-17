@@ -2233,12 +2233,12 @@ class BaseModelResource(Resource):
         if not filter_bits:
             # No filter type to resolve, use default
             return default_filter_type
-        elif filter_bits[0] not in self.get_query_terms(field_name):
+        elif filter_bits[-1] not in self.get_query_terms(field_name):
             # Not valid, maybe related field, use default
             return default_filter_type
         else:
             # A valid filter type
-            return filter_bits[0]
+            return filter_bits[-1]
 
     def filter_value_to_python(self, value, field_name, filters, filter_expr,
             filter_type):
