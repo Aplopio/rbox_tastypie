@@ -18,7 +18,7 @@ from django import forms
 from django.http import HttpRequest, QueryDict, Http404
 from django.test import TestCase
 from django.utils.encoding import force_text
-from django.utils import six
+import six
 
 from tastypie.authentication import BasicAuthentication
 from tastypie.authorization import Authorization

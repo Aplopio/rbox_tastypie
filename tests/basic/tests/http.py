@@ -3,7 +3,7 @@ from future import standard_library
 standard_library.install_aliases()
 from testcases import TestServerTestCase
 import json
-from django.utils import six
+import six
 
 try:
     from .http.client import HTTPConnection

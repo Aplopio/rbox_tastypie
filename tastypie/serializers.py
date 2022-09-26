@@ -5,7 +5,7 @@ import re
 import django
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.utils import six
+import six
 from django.utils.encoding import force_text, smart_bytes
 from django.core.serializers import json as djangojson
 import json

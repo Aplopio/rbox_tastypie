@@ -28,7 +28,7 @@ except ImportError:
 
 from django.http import HttpResponse, HttpResponseNotFound, Http404
 from django.utils.cache import patch_cache_control, patch_vary_headers
-from django.utils import six
+import six
 
 from tastypie.authentication import Authentication
 from tastypie.authorization import ReadOnlyAuthorization
