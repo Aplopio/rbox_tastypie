@@ -1,4 +1,4 @@
-from django.utils.six.moves.urllib.parse import urlparse
+from six.moves.urllib.parse import urlparse
 
 
 PROTOCOL_TO_PORT = {
