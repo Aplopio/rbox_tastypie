@@ -1,4 +1,4 @@
-Django==2.2.15
+Django==3.2.15
 python-dateutil>=2.6.0
 lxml
 defusedxml
@@ -8,3 +8,4 @@ biplist
 # Because the official 0.1.4 release (that added Py3 support) HAS NO FILES.
 # mimeparse>=0.1.3
 python-mimeparse>=0.1.4
+six==1.16.0

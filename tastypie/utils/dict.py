@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from django.utils.encoding import smart_bytes
-from django.utils import six
+import six
 
 
 def dict_strip_unicode_keys(uni_dict):

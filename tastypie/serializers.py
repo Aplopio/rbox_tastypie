@@ -5,8 +5,8 @@ import re
 import django
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.utils import six
-from django.utils.encoding import force_text, smart_bytes
+import six
+from django.utils.encoding import force_str, smart_bytes
 from django.core.serializers import json as djangojson
 import json
 
@@ -221,7 +221,7 @@ class Serializer(object):
             raise UnsupportedFormat("The format indicated '%s' had no available deserialization method. Please check your ``formats`` and ``content_types`` on your Serializer." % format)
 
         if isinstance(content, six.binary_type):
-            content = force_text(content)
+            content = force_str(content)
 
         deserialized = getattr(self, "from_%s" % desired_format)(content)
         return deserialized
@@ -266,7 +266,7 @@ class Serializer(object):
         elif data is None:
             return None
         else:
-            return force_text(data)
+            return force_str(data)
 
     def to_etree(self, data, options=None, name=None, depth=0):
         """
@@ -326,7 +326,7 @@ class Serializer(object):
                 if isinstance(simple_data, six.text_type):
                     element.text = simple_data
                 else:
-                    element.text = force_text(simple_data)
+                    element.text = force_str(simple_data)
 
         return element
 

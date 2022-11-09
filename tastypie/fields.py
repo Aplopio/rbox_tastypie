@@ -12,7 +12,7 @@ from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django import forms as djangoform
 from django.utils import datetime_safe
 from importlib import import_module
-from django.utils import six
+import six
 from tastypie.bundle import Bundle
 from tastypie.exceptions import ApiFieldError, NotFound
 from tastypie.utils import dict_strip_unicode_keys, make_aware
