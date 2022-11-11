@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 
 __author__ = 'Daniel Lindsley & the Tastypie core team'
-__version__ = (0, 19, 0, 'dev')
+__version__ = (0, 21, 0, 'dev')
 
 from django.core.handlers.wsgi import WSGIRequest
 from .response_dispatcher import HttpResponseDispatcher
