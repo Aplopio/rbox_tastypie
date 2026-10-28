@@ -5,9 +5,10 @@ from tastypie.utils.validate_jsonp import is_valid_jsonp_callback_value
 from tastypie.utils.timezone import now, make_aware, make_naive, aware_date, aware_datetime
 import inspect
 
-import django
 
-IS_DJANGO_1_4 = django.get_version().startswith('1.4')
+def is_ajax(request):
+    """Replaces ``HttpRequest.is_ajax()``, removed in Django 4.0."""
+    return request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
 
 
 def get_current_func_name():

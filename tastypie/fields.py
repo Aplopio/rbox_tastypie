@@ -10,9 +10,7 @@ from django import forms
 
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django import forms as djangoform
-from django.utils import datetime_safe
 from importlib import import_module
-import six
 from tastypie.bundle import Bundle
 from tastypie.exceptions import ApiFieldError, NotFound
 from tastypie.utils import dict_strip_unicode_keys, make_aware
@@ -234,7 +232,7 @@ class CharField(ApiField):
         if value is None:
             return None
 
-        return six.text_type(value)
+        return str(value)
 
 
 class FileField(ApiField):
@@ -390,12 +388,12 @@ class DateField(ApiField):
         if value is None:
             return None
 
-        if isinstance(value, six.string_types):
+        if isinstance(value, str):
             match = DATE_REGEX.search(value)
 
             if match:
                 data = match.groupdict()
-                return datetime_safe.date(int(data['year']), int(data['month']), int(data['day']))
+                return datetime.date(int(data['year']), int(data['month']), int(data['day']))
             else:
                 raise ApiFieldError("Date provided to '%s' field doesn't appear to be a valid date string: '%s'" % (self.instance_name, value))
 
@@ -432,12 +430,12 @@ class DateTimeField(ApiField):
         if value is None:
             return None
 
-        if isinstance(value, six.string_types):
+        if isinstance(value, str):
             match = DATETIME_REGEX.search(value)
 
             if match:
                 data = match.groupdict()
-                return make_aware(datetime_safe.datetime(int(data['year']), int(data['month']), int(data['day']), int(data['hour']), int(data['minute']), int(data['second'])))
+                return make_aware(datetime.datetime(int(data['year']), int(data['month']), int(data['day']), int(data['hour']), int(data['minute']), int(data['second'])))
             else:
                 raise ApiFieldError("Datetime provided to '%s' field doesn't appear to be a valid datetime string: '%s'" % (self.instance_name, value))
 
@@ -446,7 +444,7 @@ class DateTimeField(ApiField):
     def hydrate(self, bundle):
         value = super(DateTimeField, self).hydrate(bundle)
         if value and not hasattr(value, 'year'):
-            if isinstance(value, six.string_types):
+            if isinstance(value, str):
                 try:
                     # Try to rip a date/datetime out of it.
                     value = make_aware(parse(value))
@@ -628,7 +626,7 @@ class RelatedField(ApiField):
         if self._to_class:
             return self._to_class
 
-        if not isinstance(self.to, six.string_types):
+        if not isinstance(self.to, str):
             self._to_class = self.to
             return self._to_class
 
@@ -780,7 +778,7 @@ class RelatedField(ApiField):
                 #dont want to save objects that are pulled from a uri. Cannot have any changes anyway
                 orig_bundle.objects_saved.add(self.fk_resource.create_identifier(value.obj))
             return value
-        elif isinstance(value, six.string_types):
+        elif isinstance(value, str):
             #elif isinstance(value, tuple(self.uri_cls_list)):
             # We got a URI. Load the object and assign it.
             bundle = self.resource_from_uri(self.fk_resource, value, **kwargs)
@@ -871,7 +869,7 @@ class ToOneField(RelatedField):
     def dehydrate(self, bundle, for_list=False):
         foreign_obj = None
 
-        if isinstance(self.attribute, six.string_types):
+        if isinstance(self.attribute, str):
             attrs = self.attribute.split('__')
             foreign_obj = bundle.obj
 
@@ -1007,7 +1005,7 @@ class ToManyField(RelatedField):
         previous_obj = bundle.obj
         attr = self.attribute
 
-        if isinstance(self.attribute, six.string_types):
+        if isinstance(self.attribute, str):
             attrs = self.attribute.split('__')
             the_m2ms = bundle.obj
 
@@ -1300,7 +1298,7 @@ class TimeField(ApiField):
         return self.convert(super(TimeField, self).dehydrate(obj))
 
     def convert(self, value):
-        if isinstance(value, six.string_types):
+        if isinstance(value, str):
             return self.to_time(value)
         return value
 

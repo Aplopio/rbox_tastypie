@@ -4,7 +4,6 @@ from future import standard_library
 standard_library.install_aliases()
 from builtins import object
 from django.conf import settings
-import six
 
 from tastypie.exceptions import BadRequest
 
@@ -168,7 +167,7 @@ class Paginator(object):
             request_params = {}
 
             for k, v in list(self.request_data.items()):
-                if isinstance(v, six.text_type):
+                if isinstance(v, str):
                     request_params[k] = v.encode('utf-8')
                 else:
                     request_params[k] = v

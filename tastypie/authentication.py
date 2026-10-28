@@ -9,9 +9,13 @@ import uuid
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.exceptions import ImproperlyConfigured
-from django.middleware.csrf import _sanitize_token, constant_time_compare
+# Private names, tracking ``django/middleware/csrf.py``; re-check on the next
+# major Django upgrade.
+from django.middleware.csrf import (
+    CsrfViewMiddleware, InvalidTokenFormat, _check_token_format, _does_token_match
+)
 from tastypie.utils.http import same_origin
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from tastypie.http import HttpUnauthorized
 
 try:
@@ -257,7 +261,13 @@ class SessionAuthentication(Authentication):
         if getattr(request, '_dont_enforce_csrf_checks', False):
             return request.user.is_authenticated
 
-        csrf_token = _sanitize_token(request.COOKIES.get(settings.CSRF_COOKIE_NAME, ''))
+        try:
+            csrf_secret = CsrfViewMiddleware(lambda r: None)._get_secret(request)
+        except InvalidTokenFormat:
+            return False
+
+        if csrf_secret is None:
+            return False
 
         if request.is_secure():
             referer = request.META.get('HTTP_REFERER')
@@ -272,7 +282,12 @@ class SessionAuthentication(Authentication):
 
         request_csrf_token = request.META.get('HTTP_X_CSRFTOKEN', '') or request.POST.get('csrfmiddlewaretoken','')
 
-        if not constant_time_compare(request_csrf_token, csrf_token):
+        try:
+            _check_token_format(request_csrf_token)
+
+            if not _does_token_match(request_csrf_token, csrf_secret):
+                return False
+        except InvalidTokenFormat:
             return False
 
         return request.user.is_authenticated

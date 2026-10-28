@@ -1,16 +1,12 @@
 from __future__ import unicode_literals
 from builtins import object
 import warnings
-from django.conf.urls import url, include
 from django.core.exceptions import ImproperlyConfigured
-from django.urls import reverse
+from django.urls import include, re_path, reverse
 from django.http import HttpResponse, HttpResponseBadRequest
 from tastypie.exceptions import NotRegistered, BadRequest
 from tastypie.serializers import Serializer
-from tastypie.utils import trailing_slash, is_valid_jsonp_callback_value, \
-    IS_DJANGO_1_4
-if IS_DJANGO_1_4:
-    from django.conf.urls import patterns
+from tastypie.utils import trailing_slash, is_valid_jsonp_callback_value
 from tastypie.utils.mime import determine_format, build_content_type
 
 
@@ -103,12 +99,12 @@ class Api(object):
         ``Resources`` beneath it.
         """
         pattern_list = [
-            url(r"^(?P<api_name>%s)%s$" % (self.api_name, trailing_slash()), self.wrap_view('top_level'), name="api_%s_top_level" % self.api_name),
+            re_path(r"^(?P<api_name>%s)%s$" % (self.api_name, trailing_slash()), self.wrap_view('top_level'), name="api_%s_top_level" % self.api_name),
         ]
 
         for name in sorted(self._registry.keys()):
             self._registry[name].api_name = self.api_name
-            pattern_list.append(url(r"^(?P<api_name>%s)/" % self.api_name, include(self._registry[name].urls)))
+            pattern_list.append(re_path(r"^(?P<api_name>%s)/" % self.api_name, include(self._registry[name].urls)))
 
         urlpatterns = self.prepend_urls()
 
@@ -117,10 +113,7 @@ class Api(object):
             warnings.warn("'override_urls' is a deprecated method & will be removed by v1.0.0. Please rename your method to ``prepend_urls``.")
             urlpatterns += overridden_urls
 
-        if IS_DJANGO_1_4:
-            urlpatterns += patterns('', *pattern_list)
-        else:
-            urlpatterns = pattern_list
+        urlpatterns = pattern_list
         return urlpatterns
 
     def top_level(self, request, api_name=None):
