@@ -1,6 +1,4 @@
 from collections import OrderedDict
-from django.utils.encoding import smart_bytes
-import six
 
 
 def dict_strip_unicode_keys(uni_dict):
@@ -9,15 +7,7 @@ def dict_strip_unicode_keys(uni_dict):
 
     Useful for converting a dict to a kwarg-able format.
     """
-    if six.PY3:
-        return uni_dict
-
-    data = {}
-
-    for key, value in list(uni_dict.items()):
-        data[smart_bytes(key)] = value
-
-    return data
+    return uni_dict
 
 class LimitedSizeDict(OrderedDict):
   def __init__(self, *args, **kwds):

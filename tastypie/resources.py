@@ -9,11 +9,7 @@ import warnings
 
 from django.conf import settings
 
-from tastypie.utils import IS_DJANGO_1_4
-if IS_DJANGO_1_4:
-    from django.conf.urls import url, patterns, include
-else:
-    from django.conf.urls import url, include
+from django.urls import include, re_path
 
 from django.core.exceptions import (
     ObjectDoesNotExist, MultipleObjectsReturned, ValidationError, ImproperlyConfigured, FieldDoesNotExist
@@ -28,7 +24,6 @@ except ImportError:
 
 from django.http import HttpResponse, HttpResponseNotFound, Http404
 from django.utils.cache import patch_cache_control, patch_vary_headers
-import six
 
 from tastypie.authentication import Authentication
 from tastypie.authorization import ReadOnlyAuthorization
@@ -43,7 +38,7 @@ from tastypie.serializers import Serializer
 from tastypie.throttle import BaseThrottle
 from tastypie.utils import is_valid_jsonp_callback_value, dict_strip_unicode_keys, trailing_slash
 from tastypie.utils.mime import determine_format, build_content_type
-from tastypie.utils import get_current_func_name, get_request_class
+from tastypie.utils import get_current_func_name, get_request_class, is_ajax
 from tastypie.validation import Validation
 from tastypie.event_handler import EventHandler
 from tastypie.bundle_pre_processor import BundlePreProcessor
@@ -85,10 +80,7 @@ class NOT_AVAILABLE(object):
 class CustomRegexURLResolver(RegexURLResolver):
     @property
     def url_patterns(self):
-        if IS_DJANGO_1_4:
-            url_patterns = patterns("", *self.urlconf_name)
-        else:
-            url_patterns = self.urlconf_name
+        url_patterns = self.urlconf_name
         try:
             iter(url_patterns)
         except TypeError:
@@ -158,10 +150,7 @@ class ResourceOptions(object):
         if overrides.get('detail_allowed_methods', None) is None:
             overrides['detail_allowed_methods'] = allowed_methods
 
-        if six.PY3:
-            return object.__new__(type('ResourceOptions', (cls,), overrides))
-        else:
-            return object.__new__(type(b'ResourceOptions', (cls,), overrides))
+        return object.__new__(type('ResourceOptions', (cls,), overrides))
 
 
 class DeclarativeMetaclass(type):
@@ -217,7 +206,7 @@ class DeclarativeMetaclass(type):
         return new_class
 
 
-class Resource(six.with_metaclass(DeclarativeMetaclass)):
+class Resource(metaclass=DeclarativeMetaclass):
     """
     Handles the data, request dispatch and responding to requests.
 
@@ -285,7 +274,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                         # ``Cache-Control`` available then patch the header.
                         response = self._meta.response_router_obj[request].handle_cache_control(response, **self._meta.cache.cache_control())
 
-                if request.is_ajax() and not response.has_header("Cache-Control"):
+                if is_ajax(request) and not response.has_header("Cache-Control"):
                     # IE excessively caches XMLHttpRequests, so we're disabling
                     # the browser cache here.
                     # See http://www.enhanceie.com/ie/bugs.asp for details.
@@ -341,7 +330,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
         if settings.DEBUG:
             data = {
-                "error_message": six.text_type(exception),
+                "error_message": str(exception),
                 "traceback": the_trace,
             }
             return self.error_response(request, data, response_class=response_class)
@@ -377,10 +366,10 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         The standard URLs this ``Resource`` should respond to.
         """
         return [
-            url(r"^(?P<resource_name>%s)%s$" % (self._meta.resource_name, trailing_slash()), self.wrap_view('dispatch_list'), name="api_dispatch_list"),
-            url(r"^(?P<resource_name>%s)/schema%s$" % (self._meta.resource_name, trailing_slash()), self.wrap_view('get_schema'), name="api_get_schema"),
-            url(r"^(?P<resource_name>%s)/set/(?P<%s_list>\w[\w/;-]*)%s$" % (self._meta.resource_name, self._meta.detail_uri_name, trailing_slash()), self.wrap_view('get_multiple'), name="api_get_multiple"),
-            url(r"^(?P<resource_name>%s)/(?P<%s>\w+)%s$" % (self._meta.resource_name, self._meta.detail_uri_name, trailing_slash()), self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
+            re_path(r"^(?P<resource_name>%s)%s$" % (self._meta.resource_name, trailing_slash()), self.wrap_view('dispatch_list'), name="api_dispatch_list"),
+            re_path(r"^(?P<resource_name>%s)/schema%s$" % (self._meta.resource_name, trailing_slash()), self.wrap_view('get_schema'), name="api_get_schema"),
+            re_path(r"^(?P<resource_name>%s)/set/(?P<%s_list>\w[\w/;-]*)%s$" % (self._meta.resource_name, self._meta.detail_uri_name, trailing_slash()), self.wrap_view('get_multiple'), name="api_get_multiple"),
+            re_path(r"^(?P<resource_name>%s)/(?P<%s>\w+)%s$" % (self._meta.resource_name, self._meta.detail_uri_name, trailing_slash()), self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
         ]
 
     def override_urls(self):
@@ -449,12 +438,12 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
 
         for name, field in list(self.fields.items()):
             if isinstance(field, fields.BaseSubResourceField):
-                url_list += [url(r"^(?P<resource_name>%s)/(?P<sub_resource_name>.+)/schema/"%(self._meta.resource_name,), self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
+                url_list += [re_path(r"^(?P<resource_name>%s)/(?P<sub_resource_name>.+)/schema/"%(self._meta.resource_name,), self.wrap_view('build_sub_resource_schema'), name="%s_%s_schema"%(self._meta.resource_name,field.get_related_resource()._meta.resource_name) )]
                 sub_resource_field_list.append(field)
 
         if len(sub_resource_field_list) > 0:
             url_list += [
-                url(r"^(?P<resource_name>%s)/(?P<pk>\w+)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name,
+                re_path(r"^(?P<resource_name>%s)/(?P<pk>\w+)/(?P<%s_rest_of_url>.+)"%(self._meta.resource_name,
                                                                                        self._meta.resource_name),
                     self.wrap_view('view_to_handle_subresource'), {'%s_sub_resource_field_list'%(self._meta.resource_name): sub_resource_field_list}),
             ]
@@ -463,7 +452,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             if isinstance(field, fields.BaseSubResourceField):
                 include_urls = include(field.get_related_resource().urls)
                 url_list += [
-                    url(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls),
+                    re_path(r"^(?P<%s_resource_name>%s)/(?P<%s_pk>\w+)/"%(self._meta.resource_name, self._meta.resource_name, self._meta.resource_name), include_urls),
 
                            ]
         return url_list
@@ -2660,12 +2649,9 @@ class BaseModelResource(Resource):
                 bundle.obj.delete()
 
     def create_identifier(self, obj):
-        if IS_DJANGO_1_4:
-            return u"%s.%s.%s" % (obj._meta.app_label, obj._meta.module_name, obj.pk)
-        else:
-            return u"%s.%s.%s" % (
-                obj._meta.app_label, obj._meta.object_name.lower(), obj.pk
-            )
+        return u"%s.%s.%s" % (
+            obj._meta.app_label, obj._meta.object_name.lower(), obj.pk
+        )
 
     def trigger_field_changes(self, bundle):
         '''
@@ -2812,7 +2798,7 @@ class BaseModelResource(Resource):
             # Get the manager.
             related_mngr = None
 
-            if isinstance(field_object.attribute, six.string_types):
+            if isinstance(field_object.attribute, str):
                 related_mngr = getattr(bundle.obj, field_object.attribute)
             elif callable(field_object.attribute):
                 related_mngr = field_object.attribute(bundle)
@@ -2873,7 +2859,7 @@ class BaseModelResource(Resource):
         return kwargs
 
 
-class ModelResource(six.with_metaclass(ModelDeclarativeMetaclass, BaseModelResource)):
+class ModelResource(BaseModelResource, metaclass=ModelDeclarativeMetaclass):
     pass
 
 

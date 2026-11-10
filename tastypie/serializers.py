@@ -5,7 +5,7 @@ import re
 import django
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-import six
+import io
 from django.utils.encoding import force_str, smart_bytes
 from django.core.serializers import json as djangojson
 import json
@@ -220,7 +220,7 @@ class Serializer(object):
         if desired_format is None:
             raise UnsupportedFormat("The format indicated '%s' had no available deserialization method. Please check your ``formats`` and ``content_types`` on your Serializer." % format)
 
-        if isinstance(content, six.binary_type):
+        if isinstance(content, bytes):
             content = force_str(content)
 
         deserialized = getattr(self, "from_%s" % desired_format)(content)
@@ -261,7 +261,7 @@ class Serializer(object):
             return self.format_time(data)
         elif isinstance(data, bool):
             return data
-        elif isinstance(data, (six.integer_types, float)):
+        elif isinstance(data, (int, float)):
             return data
         elif data is None:
             return None
@@ -323,7 +323,7 @@ class Serializer(object):
                 element.set('type', get_type_string(simple_data))
 
             if data_type != 'null':
-                if isinstance(simple_data, six.text_type):
+                if isinstance(simple_data, str):
                     element.text = simple_data
                 else:
                     element.text = force_str(simple_data)
@@ -426,7 +426,7 @@ class Serializer(object):
             # See http://lxml.de/parsing.html, "Python unicode strings".
             content = XML_ENCODING.sub('', content)
             parsed = parse_xml(
-                six.StringIO(content),
+                io.StringIO(content),
                 forbid_dtd=forbid_dtd,
                 forbid_entities=forbid_entities
             )
@@ -473,7 +473,7 @@ class Serializer(object):
         if biplist is None:
             raise ImproperlyConfigured("Usage of the plist aspects requires biplist.")
 
-        if isinstance(content, six.text_type):
+        if isinstance(content, str):
             content = smart_bytes(content)
 
         return biplist.readPlistFromString(content)
@@ -505,7 +505,7 @@ def get_type_string(data):
     """
     data_type = type(data)
 
-    if data_type in six.integer_types:
+    if data_type is int:
         return 'integer'
     elif data_type == float:
         return 'float'
@@ -517,5 +517,5 @@ def get_type_string(data):
         return 'hash'
     elif data is None:
         return 'null'
-    elif isinstance(data, six.string_types):
+    elif isinstance(data, str):
         return 'string'

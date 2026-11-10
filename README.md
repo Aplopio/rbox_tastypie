@@ -1,8 +1,13 @@
 tastyapi
 ========
 
-Branched from [tastypie](https://github.com/toastdriven/django-tastypie), provides a way to use the tastypie api via a python interface apart from the http interface
+A fork of [Django Tastypie](https://github.com/toastdriven/django-tastypie). It provides a Python interface for using the Tastypie API alongside its HTTP interface.
 
+Requirements
+------------
 
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/Aplopio/rbox_tastypie/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+- Python 3.8+
+- Django 4.2 LTS (4.2.30). Other Django versions are not tested.
+- Other dependencies are listed in `requirements.txt` and `setup.py`.
 
+Install with `pip install -r requirements.txt`.
